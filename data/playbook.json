@@ -1,0 +1,55 @@
+{
+  "_comment": "Firm-authored standards. This is the only authored content in Quinn — it represents the firm's own data-processing-agreement review standards, not legal advice or fabricated case material. Every other node in the graph (Provisions, Clauses, Findings) comes from a live API call or a real document.",
+  "rules": [
+    {
+      "code": "DPA-01",
+      "title": "Sub-processor authorisation",
+      "requirement": "The processor must not engage a sub-processor without the controller's prior specific or general written authorisation, and must inform the controller of any intended changes so the controller can object."
+    },
+    {
+      "code": "DPA-02",
+      "title": "Flow-down of obligations",
+      "requirement": "Where a sub-processor is engaged, the same data-protection obligations imposed on the processor by the agreement must be imposed on the sub-processor by contract, and the processor remains fully liable for the sub-processor's performance."
+    },
+    {
+      "code": "DPA-03",
+      "title": "Audit and inspection rights",
+      "requirement": "The controller (or an independent auditor it appoints) must have the right to audit the processor's compliance, including inspections, at reasonable intervals and on reasonable notice."
+    },
+    {
+      "code": "DPA-04",
+      "title": "Breach notification timeline",
+      "requirement": "The processor must notify the controller of a personal data breach without undue delay, and in any event within 48 hours of becoming aware of it, with enough detail for the controller to meet its own regulatory notification duties."
+    },
+    {
+      "code": "DPA-05",
+      "title": "Data return or deletion on termination",
+      "requirement": "On termination of the agreement, the processor must, at the controller's choice, delete or return all personal data and delete existing copies, unless retention is required by law."
+    },
+    {
+      "code": "DPA-06",
+      "title": "International transfer safeguards",
+      "requirement": "Any transfer of personal data outside the EEA must be covered by an adequacy decision or an appropriate safeguard (such as Standard Contractual Clauses), identified by name in the agreement."
+    },
+    {
+      "code": "DPA-07",
+      "title": "Confidentiality of processing personnel",
+      "requirement": "Persons authorised to process personal data must be bound by a confidentiality obligation, whether contractual or statutory."
+    },
+    {
+      "code": "DPA-08",
+      "title": "Assistance with data subject rights",
+      "requirement": "The processor must assist the controller, by appropriate technical and organisational measures, in responding to data subject requests (access, erasure, rectification, portability, etc.)."
+    },
+    {
+      "code": "DPA-09",
+      "title": "Security of processing",
+      "requirement": "The processor must implement appropriate technical and organisational measures to ensure a level of security appropriate to the risk, including encryption, resilience, and a process for regularly testing those measures."
+    },
+    {
+      "code": "DPA-10",
+      "title": "Documented processing instructions",
+      "requirement": "The processor must process personal data only on documented instructions from the controller, including with regard to international transfers, unless required to do otherwise by law."
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "_comment": "Matter metadata authored by the firm (names, parties, status) — not legal text. Each matter's clauses are parsed verbatim from sourceFile. Edit name/client/parties once you've reviewed your real contract.md.",
+  "matters": [
+    {
+      "id": "dpa-vendor-review",
+      "name": "Vendor data-processing agreement",
+      "client": null,
+      "type": "data-processing-agreement",
+      "status": "in_review",
+      "sourceFile": "data/contract.md",
+      "required": true,
+      "parties": []
+    },
+    {
+      "id": "stanford-settlement-litigation",
+      "name": "Stanford receivership settlement — Independent Bank",
+      "client": "Independent Bank Group, Inc.",
+      "type": "litigation",
+      "status": "in_review",
+      "sourceFile": "data/litigation-settlement.md",
+      "sourceUrl": "https://www.sec.gov/Archives/edgar/data/1564618/000156461823000068/exhibit991ibsettlementagre.htm",
+      "required": false,
+      "parties": [
+        { "name": "Independent Bank (formerly Bank of Houston)", "role": "client" },
+        { "name": "Ralph S. Janvey, Receiver for the Stanford Receivership Estate", "role": "counterparty" },
+        { "name": "Official Stanford Investors Committee", "role": "counterparty" },
+        { "name": "Rotstain Investor Plaintiffs", "role": "counterparty" }
+      ]
+    }
+  ]
+}
