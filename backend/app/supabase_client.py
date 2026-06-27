@@ -22,15 +22,20 @@ def get_supabase() -> Client:
 
 def get_case_uuid_by_slug(slug: str) -> str | None:
     """Look up the Supabase cases.id (UUID) by the Neo4j matter slug."""
-    result = (
-        get_supabase()
-        .table("cases")
-        .select("id")
-        .eq("neo4j_matter_id", slug)
-        .maybe_single()
-        .execute()
-    )
-    return result.data["id"] if result.data else None
+    try:
+        result = (
+            get_supabase()
+            .table("cases")
+            .select("id")
+            .eq("neo4j_matter_id", slug)
+            .maybe_single()
+            .execute()
+        )
+        if result and result.data:
+            return result.data["id"]
+    except Exception:
+        pass
+    return None
 
 
 def ping_supabase() -> dict:
