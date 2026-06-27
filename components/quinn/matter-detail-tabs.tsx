@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EntityList } from "@/components/quinn/entity-list";
 import { MatterBoard } from "@/components/quinn/matter-board";
 import { CaseTimeline } from "@/components/quinn/case-timeline";
+import { MatterOverview } from "@/components/quinn/matter-overview";
 import type { ClauseWithFinding, MatterTimeRange } from "@/lib/graph/queries";
 
 const BackendGraph = dynamic(
@@ -20,7 +21,7 @@ const BackendGraph = dynamic(
   }
 );
 
-type Tab = "timeline" | "entities" | "graph" | "clauses";
+type Tab = "overview" | "timeline" | "entities" | "graph" | "clauses";
 
 export function MatterDetailTabs({
   matterId,
@@ -31,7 +32,7 @@ export function MatterDetailTabs({
   initialClauses: ClauseWithFinding[];
   timeRange: MatterTimeRange;
 }) {
-  const [tab, setTab] = useState<Tab>("timeline");
+  const [tab, setTab] = useState<Tab>("overview");
   const hasClauses = initialClauses.length > 0;
 
   const tabCounts = useMemo(() => {
@@ -43,6 +44,9 @@ export function MatterDetailTabs({
     <div className="space-y-6">
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
+          <TabsTrigger value="overview">
+            Overview
+          </TabsTrigger>
           <TabsTrigger value="timeline">
             Timeline
           </TabsTrigger>
@@ -64,6 +68,8 @@ export function MatterDetailTabs({
           )}
         </TabsList>
       </Tabs>
+
+      {tab === "overview" && <MatterOverview matterId={matterId} />}
 
       {tab === "timeline" && <CaseTimeline matterId={matterId} />}
 

@@ -11,6 +11,8 @@ anthropic>=0.30
 python-multipart>=0.0.9
 supabase>=2.0
 pyjwt[crypto]>=2.8
+pytesseract>=0.3
+Pillow>=10.0
 
 [dev]
 pytest>=8.0

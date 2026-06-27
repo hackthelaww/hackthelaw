@@ -1,7 +1,7 @@
 pyproject.toml
 app/__init__.py
 app/audit.py
-app/auth.py
+app/auth_middleware.py
 app/config.py
 app/db.py
 app/main.py
@@ -10,6 +10,8 @@ app/supabase_client.py
 app/ingest/__init__.py
 app/ingest/extract_text.py
 app/ingest/extraction_agent.py
+app/ingest/similarity.py
+app/ingest/summary_agent.py
 app/routes/__init__.py
 app/routes/cases.py
 app/routes/documents.py
@@ -18,6 +20,8 @@ app/routes/graph.py
 app/routes/matters.py
 app/routes/members.py
 app/routes/seed.py
+app/routes/users.py
+app/routes/wipe.py
 hackthelaw_backend.egg-info/PKG-INFO
 hackthelaw_backend.egg-info/SOURCES.txt
 hackthelaw_backend.egg-info/dependency_links.txt

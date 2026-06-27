@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
   // If no user and trying to access a protected route, redirect to login
   if (
     !user &&
+    request.nextUrl.pathname !== "/" &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/health") &&

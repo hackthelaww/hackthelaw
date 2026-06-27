@@ -1,10 +1,6 @@
 import { AppSidebar } from "@/components/quinn/app-sidebar";
 
-export default function AppLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AppShellLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-full">
       <AppSidebar />

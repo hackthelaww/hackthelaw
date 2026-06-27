@@ -24,8 +24,8 @@ export default function ErrorPage({ error, reset }: { error: Error; reset: () =>
             <Button onClick={reset} size="sm">
               Try again
             </Button>
-            <Button size="sm" variant="outline" render={<Link href="/" />}>
-              Control tower
+            <Button size="sm" variant="outline" render={<Link href="/matters" />}>
+              Dashboard
             </Button>
           </div>
         </CardContent>
