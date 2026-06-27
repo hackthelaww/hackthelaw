@@ -1,31 +1,10 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { MarketingHeader } from "@/components/quinn/marketing-header";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-50">
-        <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-10">
-          <Link href="/" className="text-base font-semibold tracking-tight text-foreground">
-            Quinn
-          </Link>
-          <nav className="flex items-center gap-6">
-            <Link
-              href="/health"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              System health
-            </Link>
-            <Link
-              href="/backend"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Backend demo
-            </Link>
-            <Button render={<Link href="/matters" />}>Enter the dashboard</Button>
-          </nav>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <div className="flex-1">{children}</div>
 
@@ -46,16 +25,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 <li>
                   <Link href="/matters" className="text-muted-foreground hover:text-foreground">
                     Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/health" className="text-muted-foreground hover:text-foreground">
-                    System health
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/backend" className="text-muted-foreground hover:text-foreground">
-                    Backend demo
                   </Link>
                 </li>
               </ul>

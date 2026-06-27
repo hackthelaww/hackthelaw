@@ -68,12 +68,6 @@ export async function AppSidebar() {
 
       {/* ── Footer ── */}
       <div className="border-t px-3 py-2 space-y-0.5">
-        <Link
-          href="/backend"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-        >
-          Backend demo
-        </Link>
         <SignOutButton />
       </div>
     </aside>

@@ -14,11 +14,7 @@ export default function ErrorPage({ error, reset }: { error: Error; reset: () =>
         <CardContent className="space-y-4">
           <p className="text-sm text-destructive">{error.message}</p>
           <p className="text-sm text-muted-foreground">
-            Quinn never falls back to fabricated data on failure — this is the real error. Check{" "}
-            <Link href="/health" className="underline">
-              system health
-            </Link>{" "}
-            or try again.
+            Quinn never falls back to fabricated data on failure — this is the real error. Try again.
           </p>
           <div className="flex gap-2">
             <Button onClick={reset} size="sm">

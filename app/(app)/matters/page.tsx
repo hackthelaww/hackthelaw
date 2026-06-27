@@ -85,11 +85,7 @@ export default async function ControlTowerPage() {
 
       {loadError && (
         <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-          Could not load matters from the graph: {loadError}. Check{" "}
-          <Link href="/health" className="underline">
-            system health
-          </Link>
-          .
+          Could not load matters from the graph: {loadError}.
         </div>
       )}
 
