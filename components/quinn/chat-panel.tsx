@@ -60,25 +60,33 @@ export function ChatPanel() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <Button onClick={() => setOpen(true)} size="sm" variant="outline" className="fixed bottom-6 right-6 z-40 shadow-md">
+      <Button
+        onClick={() => setOpen(true)}
+        variant="default"
+        className="fixed bottom-6 right-6 z-40 rounded-full px-4 shadow-lg"
+      >
         <MessageCircle className="size-4" />
         Ask Quinn
       </Button>
       <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Ask Quinn</SheetTitle>
+          <SheetTitle className="font-heading text-lg">Ask Quinn</SheetTitle>
           <SheetDescription>Answers come from the case-memory graph, not the model&apos;s memory.</SheetDescription>
         </SheetHeader>
 
         <ScrollArea className="flex-1 px-4">
           <div className="flex flex-col gap-3">
             {messages.length === 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Try asking:</p>
+              <div>
+                <p className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Try asking</p>
                 {SUGGESTIONS.map((s) => (
-                  <Button key={s} variant="outline" size="sm" className="block w-full text-left" onClick={() => ask(s)}>
+                  <button
+                    key={s}
+                    onClick={() => ask(s)}
+                    className="block w-full border-b py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/40"
+                  >
                     {s}
-                  </Button>
+                  </button>
                 ))}
               </div>
             )}

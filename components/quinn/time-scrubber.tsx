@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/format";
 import { History } from "lucide-react";
 
@@ -49,10 +48,10 @@ export function TimeScrubber({
   if (minT >= maxT) return null;
 
   return (
-    <div className="rounded-md border p-3">
+    <div className="border-b pb-4">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <History className="size-4" />
+        <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+          <History className="size-3.5" />
           {live ? "Live — current beliefs" : `Viewing as of ${formatDateTime(t)}`}
         </div>
         {!live && (
@@ -60,7 +59,6 @@ export function TimeScrubber({
             Back to live
           </Button>
         )}
-        {!live && <Badge variant="outline">Historical</Badge>}
       </div>
       <Slider
         min={minT}

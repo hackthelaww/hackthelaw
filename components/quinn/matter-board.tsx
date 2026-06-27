@@ -2,18 +2,27 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AnalyzeButton, type AnalysisEvent } from "@/components/quinn/analyze-button";
-import { InspectSheet } from "@/components/quinn/inspect-sheet";
+import { ClauseDetailPanel } from "@/components/quinn/clause-detail-panel";
 import { TimeScrubber, type SnapshotEntry } from "@/components/quinn/time-scrubber";
 import { NewInformationButton } from "@/components/quinn/new-information-button";
+import { StatusDot } from "@/components/quinn/status-dot";
 import { LANE_META, STATUS_META, DECISION_META, type Lane } from "@/components/quinn/lane-config";
 import { formatPercent } from "@/lib/format";
 import { laneFor } from "@/lib/agent/triage";
 import type { ClauseWithFinding } from "@/lib/graph/queries";
 import type { MatterTimeRange } from "@/lib/graph/queries";
+
+const LANE_ORDER: Lane[] = ["needs_judgement", "quick_confirm", "auto_cleared", "unassessed"];
+
+function pickDefaultSelection(clauses: ClauseWithFinding[]): string | null {
+  for (const lane of LANE_ORDER) {
+    const hit = clauses.find((c) => c.lane === lane);
+    if (hit) return hit.clauseId;
+  }
+  return null;
+}
 
 export function MatterBoard({
   matterId,
@@ -26,14 +35,13 @@ export function MatterBoard({
 }) {
   const router = useRouter();
   const [clauses, setClauses] = useState(initialClauses);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => pickDefaultSelection(initialClauses));
   const [model, setModel] = useState<"fast" | "reasoning">("fast");
   const [historical, setHistorical] = useState<{ entries: SnapshotEntry[]; viewingAt: number } | null>(null);
 
-  const liveClauses = clauses;
   const displayClauses = useMemo(
-    () => (historical ? applyHistoricalOverride(liveClauses, historical.entries) : liveClauses),
-    [liveClauses, historical]
+    () => (historical ? applyHistoricalOverride(clauses, historical.entries) : clauses),
+    [clauses, historical]
   );
 
   const selected = displayClauses.find((c) => c.clauseId === selectedId) ?? null;
@@ -73,7 +81,7 @@ export function MatterBoard({
   const hasHistory = timeRange.earliest !== null && timeRange.latest !== null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {hasHistory && (
         <TimeScrubber
           matterId={matterId}
@@ -85,8 +93,8 @@ export function MatterBoard({
         />
       )}
 
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 border-b pb-3">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
           <span>{clauses.length} clauses</span>
           <span>·</span>
           <span>{clauses.filter((c) => c.latestReviewDecision).length} decided</span>
@@ -94,7 +102,7 @@ export function MatterBoard({
         {isLive && (
           <div className="flex items-center gap-2">
             <NewInformationButton matterId={matterId} clauses={clauses} onApplied={handleNewInformationApplied} />
-            <Select value={model} onValueChange={(v) => setModel(v as "fast" | "reasoning")}>
+            <Select value={model} onValueChange={(v) => setModel((v ?? "fast") as "fast" | "reasoning")}>
               <SelectTrigger size="sm" className="w-[150px]">
                 <SelectValue />
               </SelectTrigger>
@@ -113,63 +121,78 @@ export function MatterBoard({
         )}
       </div>
 
-      {(["needs_judgement", "quick_confirm", "auto_cleared", "unassessed"] as Lane[]).map((lane) => {
-        const items = groups[lane];
-        if (items.length === 0) return null;
-        const meta = LANE_META[lane];
-        return (
-          <div key={lane} className="space-y-2">
-            <div>
-              <h2 className="text-sm font-semibold">
-                {meta.label} <span className="text-muted-foreground">({items.length})</span>
-              </h2>
-              <p className="text-xs text-muted-foreground">{meta.hint}</p>
-            </div>
-            <div className="space-y-2">
-              {items.map((c) => (
-                <ClauseRow key={c.clauseId} clause={c} onClick={() => setSelectedId(c.clauseId)} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="lg:w-[420px] lg:flex-shrink-0">
+          {LANE_ORDER.map((lane) => {
+            const items = groups[lane];
+            if (items.length === 0) return null;
+            const meta = LANE_META[lane];
+            return (
+              <div
+                key={lane}
+                className={lane === "needs_judgement" ? "border-l-2 border-attention pl-3" : "pl-3"}
+              >
+                <div className="pt-4 pb-1">
+                  <h2 className="font-heading text-base text-foreground">
+                    {meta.label} <span className="font-sans text-sm text-muted-foreground">({items.length})</span>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">{meta.hint}</p>
+                </div>
+                <div>
+                  {items.map((c) => (
+                    <ClauseRow
+                      key={c.clauseId}
+                      clause={c}
+                      selected={c.clauseId === selectedId}
+                      onClick={() => setSelectedId(c.clauseId)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-      <InspectSheet
-        clause={selected}
-        open={selectedId !== null}
-        onOpenChange={(open) => !open && setSelectedId(null)}
-        onDecided={handleDecided}
-        readOnly={!isLive}
-      />
+        <div className="min-h-[480px] flex-1 rounded-md border lg:sticky lg:top-4 lg:h-[calc(100vh-8rem)]">
+          <ClauseDetailPanel clause={selected} onDecided={handleDecided} readOnly={!isLive} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function ClauseRow({ clause, onClick }: { clause: ClauseWithFinding; onClick: () => void }) {
+function ClauseRow({
+  clause,
+  selected,
+  onClick,
+}: {
+  clause: ClauseWithFinding;
+  selected: boolean;
+  onClick: () => void;
+}) {
   const statusMeta = clause.status ? STATUS_META[clause.status] : null;
   const decisionMeta = clause.latestReviewDecision ? DECISION_META[clause.latestReviewDecision] : null;
 
   return (
-    <Card className="cursor-pointer transition-colors hover:bg-muted/40" onClick={onClick}>
-      <CardContent className="flex items-center justify-between gap-3 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Clause {clause.ref}</span>
-            <span className="truncate text-sm text-muted-foreground">{clause.heading}</span>
-          </div>
-          {clause.summary && <p className="mt-0.5 truncate text-xs text-muted-foreground">{clause.summary}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          {decisionMeta && <Badge variant="outline">{decisionMeta.label}</Badge>}
-          {statusMeta && <Badge className={statusMeta.badgeClass}>{statusMeta.label}</Badge>}
-          {clause.confidence !== null && (
-            <span className="w-12 shrink-0 text-right text-xs text-muted-foreground">
-              {formatPercent(clause.confidence)}
-            </span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 border-b py-3 text-left transition-colors hover:bg-muted/40 ${
+        selected ? "bg-muted/60" : ""
+      }`}
+    >
+      <StatusDot tone={statusMeta?.dot ?? "unclear"} />
+      <span className="shrink-0 font-mono text-xs uppercase tracking-wide text-muted-foreground">
+        {clause.ref}
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="truncate text-sm text-foreground">{clause.heading}</span>
+        {decisionMeta && <span className="ml-2 text-xs text-muted-foreground">{decisionMeta.label}</span>}
+      </div>
+      {clause.confidence !== null && (
+        <span className="shrink-0 text-xs text-muted-foreground">{formatPercent(clause.confidence)}</span>
+      )}
+    </button>
   );
 }
 
