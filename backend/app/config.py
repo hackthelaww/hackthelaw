@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gcs_bucket: str = ""
 
-    # Voyage AI (legal embeddings)
-    voyage_api_key: str = ""
+    # Perplexity (embeddings + search)
+    perplexity_api_key: str = ""
 
     # Supabase
     supabase_url: str = ""

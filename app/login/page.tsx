@@ -22,15 +22,25 @@ export default function LoginPage() {
     const supabase = createClient();
 
     if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (signUpError) {
+        setLoading(false);
+        setError(signUpError.message);
+        return;
+      }
+      // Auto-login after signup
+      const { error: loginError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       setLoading(false);
-      if (error) {
-        setError(error.message);
+      if (loginError) {
+        setError(loginError.message);
       } else {
-        router.push("/");
+        router.push("/matters");
         router.refresh();
       }
     } else {
@@ -42,7 +52,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push("/");
+        router.push("/matters");
         router.refresh();
       }
     }

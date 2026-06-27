@@ -20,6 +20,7 @@ from app.db import read_query, write_query
 from app.ingest.extract_text import extract_text, content_hash
 from app.ingest.similarity import find_similar_documents
 from app.ingest.semantic_similarity import find_semantic_matches, SemanticSimilarityResult
+from app.ingest.embeddings import embed_text, find_similar_by_embedding, cosine_similarity
 from app.supabase_client import get_supabase, get_case_uuid_by_slug
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -151,7 +152,47 @@ async def upload_document(
         except Exception:
             pass
 
-    # If text-based similarity found nothing, try semantic (LLM) comparison
+    # Compute embedding for the new document
+    new_embedding = embed_text(text)
+
+    # If text-based similarity found nothing, try embedding-based similarity
+    embedding_match = None
+    if (not similarity or similarity.status == "new") and case_uuid and new_embedding:
+        try:
+            # Fetch existing document embeddings from Supabase
+            existing_docs = (
+                get_supabase()
+                .table("case_documents")
+                .select("id, filename, embedding")
+                .eq("case_id", case_uuid)
+                .not_.is_("embedding", "null")
+                .execute()
+            )
+            if existing_docs and existing_docs.data:
+                existing_embs = [
+                    {"id": d["id"], "filename": d["filename"], "embedding": d["embedding"]}
+                    for d in existing_docs.data
+                    if d.get("embedding")
+                ]
+                matches = find_similar_by_embedding(new_embedding, existing_embs, threshold=0.75)
+                if matches:
+                    best = matches[0]
+                    # High similarity (>0.9) = likely evolved version
+                    # Medium (0.75-0.9) = same topic
+                    from app.ingest.similarity import SimilarityResult
+                    if best["similarity"] >= 0.9:
+                        similarity = SimilarityResult(
+                            status="near_duplicate",
+                            score=best["similarity"],
+                            matched_document_id=best["id"],
+                            matched_filename=best["filename"],
+                            diff_summary=None,
+                        )
+                    embedding_match = best
+        except Exception:
+            pass
+
+    # If still no match, try semantic (LLM) comparison as last resort
     semantic_match: SemanticSimilarityResult | None = None
     if (not similarity or similarity.status == "new") and case_uuid:
         try:
@@ -203,6 +244,7 @@ async def upload_document(
                 "similarity_parent_id": _resolve_doc_uuid(similarity.matched_document_id) if similarity and similarity.matched_document_id else None,
                 "semantic_explanation": semantic_match.explanation if semantic_match else "",
                 "semantic_key_changes": semantic_match.key_changes if semantic_match else [],
+                "embedding": new_embedding,
             }
             # Override created_at for timeline simulation
             if simulated_date:
@@ -245,6 +287,7 @@ async def upload_document(
         "duplicate": existing[0] if existing else None,
         "similarity": similarity.to_dict() if similarity else None,
         "semantic_match": semantic_match.to_dict() if semantic_match else None,
+        "embedding_match": embedding_match,
         "case_doc_id": case_doc_id,
     }
 
