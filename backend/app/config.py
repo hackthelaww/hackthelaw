@@ -1,6 +1,12 @@
-"""App configuration — reads from environment variables (or .env file)."""
+"""App configuration — reads from the root .env file."""
+
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
+
+# Root of the monorepo (hackthelaw/)
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = ROOT_DIR / ".env.development"
 
 
 class Settings(BaseSettings):
@@ -12,7 +18,7 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gcs_bucket: str = ""
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}
 
 
 settings = Settings()  # type: ignore[call-arg]

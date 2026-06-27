@@ -1,7 +1,7 @@
 import { resolve } from "path";
 import { config as loadEnv } from "dotenv";
 
-loadEnv({ path: resolve(__dirname, "..", ".env.local") });
+loadEnv({ path: resolve(__dirname, "..", ".env.development") });
 
 import { runWrite, closeNeo4j } from "@/lib/neo4j";
 import { runIngest } from "@/lib/ingest/run";

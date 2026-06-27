@@ -27,7 +27,7 @@ export async function listMattersOverview(): Promise<MatterOverview[]> {
   );
 
   return records.map((rec) => {
-    const assessments = (rec.get("assessments") as { triageScore: number | null; createdAt: number | null }[]).filter(
+    const assessments = (rec.get("assessments") as { triageScore: number | null; createdAt: unknown }[]).filter(
       (a) => a.triageScore !== null
     );
     const lanesCounts: Record<TriageLane, number> = {
@@ -38,8 +38,9 @@ export async function listMattersOverview(): Promise<MatterOverview[]> {
     let lastUpdatedAt: number | null = null;
     for (const a of assessments) {
       lanesCounts[laneFor(a.triageScore as number)]++;
-      if (a.createdAt !== null && (lastUpdatedAt === null || a.createdAt > lastUpdatedAt)) {
-        lastUpdatedAt = a.createdAt;
+      const ts = toNumber(a.createdAt);
+      if (ts !== 0 && (lastUpdatedAt === null || ts > lastUpdatedAt)) {
+        lastUpdatedAt = ts;
       }
     }
 

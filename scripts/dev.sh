@@ -15,11 +15,14 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# Start FastAPI backend
+# Kill anything already on these ports
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+
+# Start FastAPI backend (run from backend/ so it finds .env)
 echo "Starting backend (FastAPI) on :8000..."
 cd "$ROOT/backend"
-source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000 &
+.venv/bin/uvicorn app.main:app --reload --port 8000 &
 BACKEND_PID=$!
 
 # Start Next.js frontend
