@@ -134,3 +134,53 @@ export async function getEntitySummary(matterId: string) {
     `/api/entities/${encodeURIComponent(matterId)}/summary`
   );
 }
+
+// ---------------------------------------------------------------------------
+// Timeline
+// ---------------------------------------------------------------------------
+
+export interface TimelineBatch {
+  batch_date: string;
+  batch_index: number;
+  documents: {
+    id: string;
+    filename: string;
+    title: string;
+    uploaded_at: string;
+    similarity_status: string;
+    similarity_score: number | null;
+    similarity_parent_filename: string | null;
+    version_number: number;
+    version_chain: { id: string; filename: string; version_number: number }[];
+    entity_count: number;
+    extraction_status: string;
+    char_count: number;
+  }[];
+  new_doc_count: number;
+  batch_entity_count: number;
+  cumulative_entity_count: number;
+  cumulative_doc_count: number;
+}
+
+export interface TimelineData {
+  batches: TimelineBatch[];
+  total_documents: number;
+  total_entities: number;
+  total_duplicates_skipped: number;
+  date_range: { first: string | null; last: string | null };
+}
+
+export async function getTimeline(slug: string): Promise<TimelineData> {
+  return request<TimelineData>(`/api/cases/${encodeURIComponent(slug)}/timeline`);
+}
+
+export async function getDocumentDiff(docId: string) {
+  return request<{
+    original_filename: string;
+    new_filename: string;
+    similarity_score: number;
+    diff_summary: string;
+    original_chars: number;
+    new_chars: number;
+  }>(`/api/documents/${encodeURIComponent(docId)}/diff`);
+}

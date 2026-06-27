@@ -181,6 +181,7 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
   const [source, setSource] = useState<"human" | "ai" | null>(null);
   const [results, setResults] = useState<FileResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [simulatedDate, setSimulatedDate] = useState("");
 
   function reset() {
     setStep("pick-files");
@@ -190,6 +191,7 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
     setSource(null);
     setResults([]);
     setCurrentIndex(0);
+    setSimulatedDate("");
   }
 
   function handleFilesSelected() {
@@ -230,6 +232,9 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
         const form = new FormData();
         form.append("file", file);
         form.append("matter_id", mId);
+        if (simulatedDate) {
+          form.append("simulated_date", simulatedDate);
+        }
 
         const uploadRes = await fetch(`${BACKEND}/api/documents/upload`, {
           method: "POST",
@@ -281,6 +286,20 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
         );
         if (!extractRes.ok) throw new Error(await extractRes.text());
         const extractData = await extractRes.json();
+
+        // Auto-link near-duplicates as versions
+        if (similarity?.status === "near_duplicate" && uploadData.similarity?.matched_document_id) {
+          try {
+            await fetch(`${BACKEND}/api/documents/link-version`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...authHeaders },
+              body: JSON.stringify({
+                new_document_id: uploadData.case_doc_id || confirmed.document_id,
+                parent_document_id: uploadData.similarity.matched_document_id,
+              }),
+            });
+          } catch { /* version linking failed, not critical */ }
+        }
 
         allResults.push({
           filename: file.name,
@@ -349,6 +368,28 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
                   onChange={handleFilesSelected}
                 />
               </label>
+
+              {/* Simulated date for demo/testing */}
+              <div className="mt-3 flex items-center gap-2">
+                <label htmlFor="sim-date" className="text-xs text-muted-foreground whitespace-nowrap">
+                  Simulate upload date:
+                </label>
+                <input
+                  id="sim-date"
+                  type="date"
+                  value={simulatedDate}
+                  onChange={(e) => setSimulatedDate(e.target.value)}
+                  className="rounded-md border bg-background px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+                {simulatedDate && (
+                  <button
+                    onClick={() => setSimulatedDate("")}
+                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    clear
+                  </button>
+                )}
+              </div>
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}

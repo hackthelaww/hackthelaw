@@ -40,6 +40,7 @@ async def upload_document(
     file: UploadFile = File(...),
     matter_id: str = Form(...),
     title: str = Form(""),
+    simulated_date: str = Form(""),
     user: AuthUser = Depends(get_current_user),
 ) -> dict:
     """Upload a PDF or text file. Returns extracted text preview for confirmation.
@@ -141,7 +142,7 @@ async def upload_document(
     # Insert pending row into Supabase case_documents (with similarity info)
     if case_uuid:
         try:
-            get_supabase().table("case_documents").insert({
+            doc_row: dict = {
                 "id": case_doc_id,
                 "case_id": case_uuid,
                 "filename": file.filename,
@@ -154,7 +155,11 @@ async def upload_document(
                 "similarity_status": similarity.status if similarity else "new",
                 "similarity_score": similarity.score if similarity else None,
                 "similarity_parent_id": similarity.matched_document_id if similarity else None,
-            }).execute()
+            }
+            # Override created_at for timeline simulation
+            if simulated_date:
+                doc_row["created_at"] = f"{simulated_date}T12:00:00+00:00"
+            get_supabase().table("case_documents").insert(doc_row).execute()
         except Exception:
             pass
 
@@ -191,6 +196,7 @@ async def upload_document(
         "full_text": text,
         "duplicate": existing[0] if existing else None,
         "similarity": similarity.to_dict() if similarity else None,
+        "case_doc_id": case_doc_id,
     }
 
 
@@ -543,3 +549,72 @@ async def link_as_version(body: LinkVersionRequest, user: AuthUser = Depends(get
     }).eq("id", body.new_document_id).execute()
 
     return {"linked": True, "version_number": new_version}
+
+
+# ---------------------------------------------------------------------------
+# Diff — compare a document with its similarity parent
+# ---------------------------------------------------------------------------
+
+@router.get("/{document_id}/diff")
+async def get_document_diff(document_id: str) -> dict:
+    """Get a diff between a near-duplicate document and its similarity parent."""
+    sb = get_supabase()
+
+    # Find this document and its similarity parent
+    doc_result = (
+        sb.table("case_documents")
+        .select("id, filename, similarity_parent_id, similarity_score, neo4j_document_id")
+        .eq("id", document_id)
+        .maybe_single()
+        .execute()
+    )
+    if not doc_result or not doc_result.data:
+        raise HTTPException(404, "Document not found")
+
+    doc = doc_result.data
+    parent_id = doc.get("similarity_parent_id")
+    if not parent_id:
+        raise HTTPException(422, "Document has no similarity parent — not a near-duplicate")
+
+    # Get parent's Neo4j document ID
+    parent_result = (
+        sb.table("case_documents")
+        .select("filename, neo4j_document_id")
+        .eq("id", parent_id)
+        .maybe_single()
+        .execute()
+    )
+    if not parent_result or not parent_result.data:
+        raise HTTPException(404, "Parent document not found")
+
+    parent = parent_result.data
+
+    # Fetch text content from Neo4j for both documents
+    async def get_text(neo4j_doc_id: str) -> str:
+        rows = await read_query(
+            """
+            MATCH (d:Document {id: $did})-[:HAS_VERSION]->(v:Version)
+            RETURN v.content AS content ORDER BY v.version_no DESC LIMIT 1
+            """,
+            {"did": neo4j_doc_id},
+        )
+        return rows[0]["content"] if rows else ""
+
+    new_text = await get_text(doc.get("neo4j_document_id", ""))
+    parent_text = await get_text(parent.get("neo4j_document_id", ""))
+
+    if not new_text or not parent_text:
+        raise HTTPException(422, "Could not fetch document text for comparison")
+
+    from app.ingest.similarity import compute_diff_summary
+
+    diff = compute_diff_summary(parent_text, new_text, max_lines=50)
+
+    return {
+        "original_filename": parent["filename"],
+        "new_filename": doc["filename"],
+        "similarity_score": doc.get("similarity_score"),
+        "diff_summary": diff,
+        "original_chars": len(parent_text),
+        "new_chars": len(new_text),
+    }

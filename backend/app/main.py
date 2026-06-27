@@ -16,6 +16,7 @@ from app.routes.documents import router as documents_router
 from app.routes.entities import router as entities_router
 from app.routes.users import router as users_router
 from app.routes.wipe import router as wipe_router
+from app.routes.timeline import router as timeline_router
 
 
 @asynccontextmanager
@@ -49,6 +50,7 @@ app.include_router(documents_router)
 app.include_router(entities_router)
 app.include_router(users_router)       # Admin user management
 app.include_router(wipe_router)        # Dev: wipe databases
+app.include_router(timeline_router)    # Case timeline
 
 
 @app.get("/health")

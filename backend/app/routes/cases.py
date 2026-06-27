@@ -296,10 +296,39 @@ async def regenerate_summary(slug: str, user: AuthUser = Depends(get_current_use
     )
     summary["doc_count"] = doc_count[0]["c"] if doc_count else 0
 
+    # Historize: save current summary before overwriting
+    current = get_supabase().table("cases").select("ai_summary").eq("id", case_uuid).single().execute()
+    if current.data and current.data.get("ai_summary"):
+        try:
+            get_supabase().table("case_summary_history").insert({
+                "case_id": case_uuid,
+                "summary": current.data["ai_summary"],
+                "doc_count": current.data["ai_summary"].get("doc_count", 0),
+            }).execute()
+        except Exception:
+            pass
+
     get_supabase().table("cases").update({"ai_summary": summary}).eq("id", case_uuid).execute()
     log_action("summary_regenerated", case_id=case_uuid, user_id=user.id)
 
     return summary
+
+
+@router.get("/{slug}/summary/history")
+async def get_summary_history(slug: str, user: AuthUser = Depends(get_current_user)) -> list[dict]:
+    """Get historical summary snapshots for a case."""
+    case_uuid = _require_case_uuid(slug)
+    _check_case_access(case_uuid, user.id)
+
+    result = (
+        get_supabase()
+        .table("case_summary_history")
+        .select("*")
+        .eq("case_id", case_uuid)
+        .order("generated_at")
+        .execute()
+    )
+    return result.data or []
 
 
 # ---------------------------------------------------------------------------
