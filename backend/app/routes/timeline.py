@@ -87,6 +87,13 @@ async def get_timeline(slug: str, user: AuthUser = Depends(get_current_user)) ->
                     parent_filenames[doc["id"]] = d["filename"]
                     break
 
+    # Track which docs have been superseded (another doc points to them as parent)
+    superseded_ids: set[str] = set()
+    for doc in docs:
+        parent = doc.get("similarity_parent_id") or doc.get("parent_document_id")
+        if parent:
+            superseded_ids.add(parent)
+
     # Group documents by calendar date
     batches_map: dict[str, list[dict]] = defaultdict(list)
     for doc in docs:
@@ -114,6 +121,7 @@ async def get_timeline(slug: str, user: AuthUser = Depends(get_current_user)) ->
             "source": doc.get("source", "upload"),
             "extraction_status": doc.get("extraction_status", "pending"),
             "char_count": doc.get("char_count", 0),
+            "has_newer_version": doc["id"] in superseded_ids,
         })
 
     # Build sorted batches with cumulative counts

@@ -274,10 +274,9 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
           continue;
         }
 
-        // Flagged files need user decision
-        const isFlagged = similarity?.status === "near_duplicate" ||
-          similarity?.status === "similar" ||
-          semanticMatch?.relationship === "evolved_version";
+        // Only flag for user decision if ≥99% match (near-identical)
+        const isFlagged = similarity?.status === "near_duplicate" &&
+          (similarity?.score ?? 0) >= 0.99;
 
         pending.push({
           index: i,

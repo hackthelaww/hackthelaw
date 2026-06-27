@@ -172,6 +172,7 @@ export interface TimelineBatch {
     entity_count: number;
     extraction_status: string;
     char_count: number;
+    has_newer_version: boolean;
   }[];
   new_doc_count: number;
   batch_entity_count: number;

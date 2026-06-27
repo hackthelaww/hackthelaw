@@ -15,11 +15,20 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function StatusBadge({ status, score, parentFilename }: {
+function StatusBadge({ status, score, parentFilename, hasNewerVersion }: {
   status: string;
   score: number | null;
   parentFilename: string | null;
+  hasNewerVersion?: boolean;
 }) {
+  // If this doc has been superseded by a newer version, show that instead
+  if (hasNewerVersion && status === "new") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        Superseded
+      </span>
+    );
+  }
   if (status === "exact_duplicate") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600">
@@ -79,7 +88,7 @@ function DocumentCard({ doc, matterId, onViewDiff }: {
     : "Unknown";
 
   return (
-    <div className={`group rounded-md border transition-all hover:border-foreground/20 ${isDupe ? "opacity-50" : ""}`}>
+    <div className={`group rounded-md border transition-all hover:border-foreground/20 ${isDupe ? "opacity-50" : ""} ${doc.has_newer_version ? "opacity-60" : ""}`}>
       <div className="flex items-start gap-3 p-3">
         {/* Uploader avatar — AI-generated docs get a distinct indicator */}
         {doc.source === "ai" ? (
@@ -103,6 +112,7 @@ function DocumentCard({ doc, matterId, onViewDiff }: {
               status={doc.similarity_status}
               score={doc.similarity_score}
               parentFilename={doc.similarity_parent_filename}
+              hasNewerVersion={doc.has_newer_version}
             />
           </div>
 

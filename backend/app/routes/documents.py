@@ -177,10 +177,10 @@ async def upload_document(
                 matches = find_similar_by_embedding(new_embedding, existing_embs, threshold=0.75)
                 if matches:
                     best = matches[0]
-                    # High similarity (>0.9) = likely evolved version
-                    # Medium (0.75-0.9) = same topic
+                    # Only flag as near_duplicate at ≥0.99 (nearly identical)
+                    # Everything else is treated as a new document
                     from app.ingest.similarity import SimilarityResult
-                    if best["similarity"] >= 0.9:
+                    if best["similarity"] >= 0.99:
                         similarity = SimilarityResult(
                             status="near_duplicate",
                             score=best["similarity"],
@@ -727,17 +727,70 @@ async def get_document_diff(document_id: str) -> dict:
     if not new_text or not parent_text:
         raise HTTPException(422, "Could not fetch document text for comparison")
 
-    from app.ingest.similarity import compute_diff_summary
+    import difflib
 
-    diff = compute_diff_summary(parent_text, new_text, max_lines=50)
+    # Generate unified diff for raw view
+    from app.ingest.similarity import compute_diff_summary
+    diff_summary = compute_diff_summary(parent_text, new_text, max_lines=100)
+
+    # Generate structured side-by-side diff (GitHub-style)
+    parent_lines = parent_text.splitlines()
+    new_lines = new_text.splitlines()
+    matcher = difflib.SequenceMatcher(None, parent_lines, new_lines)
+
+    diff_blocks: list[dict] = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for k in range(i1, i2):
+                diff_blocks.append({
+                    "type": "equal",
+                    "old_line": k + 1,
+                    "new_line": j1 + (k - i1) + 1,
+                    "old_text": parent_lines[k],
+                    "new_text": new_lines[j1 + (k - i1)],
+                })
+        elif tag == "replace":
+            max_len = max(i2 - i1, j2 - j1)
+            for k in range(max_len):
+                diff_blocks.append({
+                    "type": "changed",
+                    "old_line": (i1 + k + 1) if k < (i2 - i1) else None,
+                    "new_line": (j1 + k + 1) if k < (j2 - j1) else None,
+                    "old_text": parent_lines[i1 + k] if k < (i2 - i1) else "",
+                    "new_text": new_lines[j1 + k] if k < (j2 - j1) else "",
+                })
+        elif tag == "delete":
+            for k in range(i1, i2):
+                diff_blocks.append({
+                    "type": "removed",
+                    "old_line": k + 1,
+                    "new_line": None,
+                    "old_text": parent_lines[k],
+                    "new_text": "",
+                })
+        elif tag == "insert":
+            for k in range(j1, j2):
+                diff_blocks.append({
+                    "type": "added",
+                    "old_line": None,
+                    "new_line": k + 1,
+                    "old_text": "",
+                    "new_text": new_lines[k],
+                })
 
     return {
         "original_filename": parent["filename"],
         "new_filename": doc["filename"],
         "similarity_score": doc.get("similarity_score"),
-        "diff_summary": diff,
+        "diff_summary": diff_summary,
+        "diff_blocks": diff_blocks,
         "original_chars": len(parent_text),
         "new_chars": len(new_text),
+        "stats": {
+            "additions": sum(1 for b in diff_blocks if b["type"] in ("added", "changed") and b["new_text"]),
+            "deletions": sum(1 for b in diff_blocks if b["type"] in ("removed", "changed") and b["old_text"]),
+            "unchanged": sum(1 for b in diff_blocks if b["type"] == "equal"),
+        },
     }
 
 
@@ -980,22 +1033,10 @@ async def get_document_lifecycle(document_id: str) -> dict:
             "semantic_explanation": doc.get("semantic_explanation", ""),
         })
 
-    # Reviews (AI extractions are tracked as reviews)
-    reviews = []
-    for i, doc in enumerate(chain_docs):
-        if doc.get("extraction_status") == "done":
-            reviews.append({
-                "id": f"{doc['id']}::review",
-                "type": "ai_review",
-                "date": doc.get("created_at", ""),
-                "reviewer": "AI",
-                "linked_version": doc["id"],
-            })
-
     return {
         "document_name": root_doc.data.get("title") or root_doc.data.get("filename", ""),
         "document_type": chain_docs[0].get("doc_type", "") if chain_docs else "",
         "total_versions": len(versions),
         "versions": versions,
-        "reviews": reviews,
+        "reviews": [],
     }
