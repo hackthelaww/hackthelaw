@@ -18,6 +18,7 @@ from app.routes.users import router as users_router
 from app.routes.wipe import router as wipe_router
 from app.routes.case_events import router as case_events_router
 from app.routes.timeline import router as timeline_router
+from app.routes.query import router as query_router
 
 
 @asynccontextmanager
@@ -53,6 +54,7 @@ app.include_router(users_router)       # Admin user management
 app.include_router(wipe_router)        # Dev: wipe databases
 app.include_router(timeline_router)    # Case timeline
 app.include_router(case_events_router) # Case intelligence events
+app.include_router(query_router)       # Query agent (chat)
 
 
 @app.get("/health")

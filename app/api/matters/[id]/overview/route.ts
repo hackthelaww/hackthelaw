@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getMatterDetail, getMatterEntitySummary } from "@/lib/graph/queries";
 import { queryRecentChanges, type ChangeEntry } from "@/lib/chat/tools";
 import { completeStream } from "@/lib/perplexity";
 
 export const dynamic = "force-dynamic";
-
-function serviceClient() {
-  return createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!
-  );
-}
 
 function renderChanges(changes: ChangeEntry[], isFirstVisit: boolean): string {
   if (isFirstVisit) return "This is your first visit to this matter.";
@@ -44,9 +36,10 @@ export async function GET(
   }
   const { matter, clauses } = detail;
 
-  const sb = serviceClient();
-
-  const { data: visitRow } = await sb
+  // Use the authenticated client so RLS (user_id = auth.uid()) works correctly.
+  // The service client bypasses RLS but has no user session, so auth.uid() is
+  // null — meaning SELECT returns no rows and upsert fails the WITH CHECK.
+  const { data: visitRow } = await supabase
     .from("matter_visits")
     .select("last_viewed_at")
     .eq("user_id", user.id)
@@ -58,7 +51,7 @@ export async function GET(
     : null;
   const isFirstVisit = previousVisit === null;
 
-  await sb
+  await supabase
     .from("matter_visits")
     .upsert(
       { user_id: user.id, matter_id: matterId, last_viewed_at: new Date().toISOString() },
@@ -90,13 +83,16 @@ export async function GET(
     .filter(Boolean)
     .join("\n");
 
-  const prompt = `You are Quinn, drafting a short "welcome back" overview directly to the partner who is
-reopening this matter. Address them as "you" — never as "the partner" or in the third person. Use ONLY
-the facts below — never invent a fact, name, or number that isn't given. Write 3-5 short bullet points,
-each on its own line starting with "• " (a bullet character, not a hyphen), covering, in order: (1) what
-changed since your last visit and when the last document was uploaded (also name the document name and who uploaded it including a link to the document), (2) the current phase of the matter (e.g. pre-litigation, pleadings, discovery, pretrial motions, and trial), (3) what needs to be done next. If a category has
-nothing to report, say so plainly in one short bullet rather than skipping it silently. Keep the whole
-thing under 80 words.
+  const prompt = `You are Quinn, drafting a short "welcome back" overview for a lawyer/partner who is
+reopening this matter. The user is the LAWYER reviewing this case — NOT a party to the case. When
+describing case facts, refer to parties by name (e.g. "Mitchell was dismissed" not "you were dismissed").
+Use "you" ONLY when referring to the lawyer's own actions (e.g. "since your last visit", "you uploaded").
+Use ONLY the facts below — never invent a fact, name, or number that isn't given. Write 3-5 short bullet
+points, each on its own line starting with "• " (a bullet character, not a hyphen), covering, in order:
+(1) what changed since the last visit and when the last document was uploaded (also name the document name
+and who uploaded it), (2) the current phase of the matter (e.g. pre-litigation, pleadings, discovery,
+pretrial motions, and trial), (3) what needs to be done next. If a category has nothing to report, say so
+plainly in one short bullet rather than skipping it silently. Keep the whole thing under 80 words.
 
 MATTER: ${matter.name}
 

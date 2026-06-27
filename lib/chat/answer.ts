@@ -18,8 +18,8 @@ const MIN_RELEVANCE = 0.3;
  * dropped and the model is told explicitly so it says so plainly rather than stretching
  * a weak match into an answer.
  */
-export async function answerQuestion(question: string): Promise<ChatAnswer> {
-  const { hits, citations, topScore } = await querySemanticGraph(question);
+export async function answerQuestion(question: string, matterId?: string): Promise<ChatAnswer> {
+  const { hits, citations, topScore } = await querySemanticGraph(question, matterId);
   const groundingEmpty = topScore < MIN_RELEVANCE;
   const context = groundingEmpty ? "(no matching data found in the knowledgebase)" : renderHits(hits);
 

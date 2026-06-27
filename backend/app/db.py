@@ -84,6 +84,21 @@ def write_query_sync(cypher: str, params: dict | None = None) -> list[dict]:
     return records
 
 
+def read_query_sync(cypher: str, params: dict | None = None) -> list[dict]:
+    """Synchronous read — for use inside Strands @tool functions."""
+    from neo4j import GraphDatabase
+
+    driver = GraphDatabase.driver(
+        settings.neo4j_uri,
+        auth=(settings.neo4j_username, settings.neo4j_password),
+    )
+    with driver.session(database="neo4j") as session:
+        result = session.run(cypher, params or {})
+        records = [_to_native(dict(r)) for r in result]
+    driver.close()
+    return records
+
+
 async def ping() -> dict:
     """Verify connectivity to Neo4j."""
     try:
