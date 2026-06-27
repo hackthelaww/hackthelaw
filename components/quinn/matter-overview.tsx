@@ -31,7 +31,9 @@ export function MatterOverview({ matterId }: { matterId: string }) {
     createClient()
       .auth.getSession()
       .then(({ data: { session } }) => {
-        if (session?.user.email) setName(session.user.email.split("@")[0]);
+        const firstName = session?.user.user_metadata?.first_name as string | undefined;
+        if (firstName) setName(firstName);
+        else if (session?.user.email) setName(session.user.email.split("@")[0]);
       });
   }, []);
 

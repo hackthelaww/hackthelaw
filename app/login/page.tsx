@@ -9,6 +9,7 @@ type Mode = "login" | "signup";
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +26,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
+        options: { data: { first_name: firstName } },
       });
       setLoading(false);
       if (error) {
@@ -79,6 +81,23 @@ export default function LoginPage() {
               />
             </div>
 
+            {mode === "signup" && (
+              <div>
+                <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-1.5">
+                  First name
+                </label>
+                <input
+                  id="firstName"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Jamie"
+                  required
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1.5">
                 Password
@@ -101,7 +120,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || (mode === "signup" && !firstName)}
               className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "..." : mode === "signup" ? "Create account" : "Sign in"}
