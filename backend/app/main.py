@@ -6,11 +6,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import close_driver, ping
+from app.supabase_client import ping_supabase
 from app.routes.matters import router as matters_router
+from app.routes.cases import router as cases_router
+from app.routes.members import router as members_router
 from app.routes.graph import router as graph_router
 from app.routes.seed import router as seed_router
 from app.routes.documents import router as documents_router
 from app.routes.entities import router as entities_router
+from app.routes.users import router as users_router
+from app.routes.wipe import router as wipe_router
 
 
 @asynccontextmanager
@@ -21,7 +26,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="HackTheLaw — Legal Second Brain",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -35,17 +40,24 @@ app.add_middleware(
 )
 
 # Routes
-app.include_router(matters_router)
+app.include_router(matters_router)     # Legacy Neo4j-only matters CRUD
+app.include_router(cases_router)       # New Supabase-backed cases CRUD
+app.include_router(members_router)     # Team member management
 app.include_router(graph_router)
 app.include_router(seed_router)
 app.include_router(documents_router)
 app.include_router(entities_router)
+app.include_router(users_router)       # Admin user management
+app.include_router(wipe_router)        # Dev: wipe databases
 
 
 @app.get("/health")
 async def health():
     neo4j_status = await ping()
+    supabase_status = ping_supabase()
+    both_ok = neo4j_status.get("ok") and supabase_status.get("ok")
     return {
-        "status": "ok" if neo4j_status.get("ok") else "degraded",
+        "status": "ok" if both_ok else "degraded",
         "neo4j": neo4j_status,
+        "supabase": supabase_status,
     }

@@ -5,14 +5,31 @@
  * In production: should go through a reverse proxy / same origin.
  */
 
+import { createClient } from "@/lib/supabase/client";
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return { Authorization: `Bearer ${session.access_token}` };
+    }
+  } catch {
+    // No auth available (e.g. server-side without session)
+  }
+  return {};
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const url = `${BACKEND_URL}${path}`;
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(url, {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...authHeaders,
       ...init?.headers,
     },
     // Don't cache server-side fetches in Next.js

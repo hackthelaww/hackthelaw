@@ -15,15 +15,22 @@ export interface MatterOverview {
   lastUpdatedAt: number | null;
 }
 
-export async function listMattersOverview(): Promise<MatterOverview[]> {
+export async function listMattersOverview(
+  /** When provided, only return matters whose id is in this list. */
+  matterIds?: string[]
+): Promise<MatterOverview[]> {
+  const whereClause =
+    matterIds && matterIds.length > 0 ? "WHERE m.id IN $matterIds" : "";
   const records = await runRead(
     `MATCH (m:Matter)
+     ${whereClause}
      OPTIONAL MATCH (m)<-[:INVOLVES]-()
      OPTIONAL MATCH (c:Clause {matterId: m.id})
      OPTIONAL MATCH (c)-[r:ASSESSED_AS]->(f:Finding) WHERE r.expiredAt IS NULL
      RETURN m.id AS id, m.name AS name, m.client AS client, m.type AS type, m.status AS status,
             count(DISTINCT c) AS clauseCount,
-            collect(DISTINCT {triageScore: f.triageScore, createdAt: r.createdAt}) AS assessments`
+            collect(DISTINCT {triageScore: f.triageScore, createdAt: r.createdAt}) AS assessments`,
+    matterIds && matterIds.length > 0 ? { matterIds } : undefined
   );
 
   return records.map((rec) => {

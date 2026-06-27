@@ -2,7 +2,7 @@
 name = "hackthelaw-backend"
 version = "0.1.0"
 description = "Legal second-brain backend — FastAPI + Neo4j"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
@@ -15,6 +15,8 @@ dependencies = [
     "strands-agents>=1.0",   # agent framework (model-agnostic)
     "anthropic>=0.30",       # Anthropic SDK (for Strands)
     "python-multipart>=0.0.9", # file uploads in FastAPI
+    "supabase>=2.0",           # Supabase Python client
+    "pyjwt[crypto]>=2.8",     # JWT decoding for Supabase Auth
 ]
 
 [project.optional-dependencies]

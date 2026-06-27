@@ -278,16 +278,16 @@ Add to `.env.development`:
 
 ```
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...   # server-side only, never expose to frontend
+SUPABASE_PUBLISHABLE_KEY=eyJ...
+SUPABASE_SECRET_KEY=eyJ...         # server-side only, never expose to frontend
 ```
 
 FastAPI backend config (`backend/app/config.py`) needs:
 
 ```python
 supabase_url: str = ""
-supabase_anon_key: str = ""
-supabase_service_role_key: str = ""
+supabase_publishable_key: str = ""
+supabase_secret_key: str = ""
 ```
 
 Python package: `pip install supabase`

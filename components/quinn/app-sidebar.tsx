@@ -1,14 +1,21 @@
 import Link from "next/link";
 import { listMattersOverview, type MatterOverview } from "@/lib/graph/queries";
+import { getUserMatterSlugs } from "@/lib/supabase/cases";
 import { SidebarMatterList } from "@/components/quinn/sidebar-matter-list";
 import { ChatPanel } from "@/components/quinn/chat-panel";
+import { SignOutButton } from "@/components/quinn/sign-out-button";
 import { Search } from "lucide-react";
 
 export async function AppSidebar() {
   let matters: MatterOverview[] = [];
   let loadError: string | null = null;
   try {
-    matters = await listMattersOverview();
+    const slugs = await getUserMatterSlugs();
+    if (slugs !== null && slugs.length === 0) {
+      matters = [];
+    } else {
+      matters = await listMattersOverview(slugs ?? undefined);
+    }
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);
   }
@@ -69,6 +76,7 @@ export async function AppSidebar() {
           Backend demo
         </Link>
         <ChatPanel />
+        <SignOutButton />
       </div>
     </aside>
   );

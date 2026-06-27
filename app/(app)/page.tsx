@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { listMattersOverview, type MatterOverview } from "@/lib/graph/queries";
+import { getUserMatterSlugs } from "@/lib/supabase/cases";
 import { StatusDot } from "@/components/quinn/status-dot";
 import { relativeTime } from "@/lib/format";
 import { UploadDocumentButton } from "@/components/quinn/upload-document";
@@ -15,7 +16,13 @@ export default async function ControlTowerPage() {
   let matters: MatterOverview[];
   let loadError: string | null = null;
   try {
-    matters = await listMattersOverview();
+    const slugs = await getUserMatterSlugs();
+    // If user has no assigned cases, show empty state (not all matters)
+    if (slugs !== null && slugs.length === 0) {
+      matters = [];
+    } else {
+      matters = await listMattersOverview(slugs ?? undefined);
+    }
   } catch (err) {
     loadError = err instanceof Error ? err.message : String(err);
     matters = [];
@@ -88,8 +95,7 @@ export default async function ControlTowerPage() {
 
       {!loadError && matters.length === 0 && (
         <div className="rounded-md border p-4 text-sm text-muted-foreground">
-          No matters in the graph yet. Run <code>npm run ingest</code> to load real GDPR
-          provisions, the firm playbook, and your seed matters.
+          No matters assigned to you yet. Ask a case owner to add you, or create a new case.
         </div>
       )}
 

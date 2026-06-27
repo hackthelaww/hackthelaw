@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gcs_bucket: str = ""
 
+    # Supabase
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
+    supabase_jwt_secret: str = ""
+
     # "ignore" rather than the pydantic-settings default of "forbid" — this env
     # file is shared with the Next.js frontend, which has its own keys
     # (PERPLEXITY_API_KEY, etc.) that aren't this app's concern.
