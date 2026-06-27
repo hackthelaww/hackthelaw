@@ -4,6 +4,9 @@ app/config.py
 app/db.py
 app/main.py
 app/models.py
+app/ingest/__init__.py
+app/ingest/extract_text.py
+app/ingest/extraction_agent.py
 app/routes/__init__.py
 app/routes/documents.py
 app/routes/entities.py
