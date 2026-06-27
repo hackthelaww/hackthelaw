@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import AuthUser, get_current_user
+from app.auth_middleware import AuthUser, get_current_user
 from app.audit import log_action
 from app.supabase_client import get_supabase, get_case_uuid_by_slug
 

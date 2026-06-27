@@ -1,14 +1,16 @@
-"""Supabase Auth — JWT validation for FastAPI."""
+"""Supabase Auth — JWT validation for FastAPI.
+
+Uses the Supabase client (service role) to verify tokens, which handles
+the new key format (EdDSA/ES256) automatically.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
-
-from app.config import settings
+from app.supabase_client import get_supabase
 
 
 @dataclass
@@ -28,33 +30,23 @@ def _extract_token(request: Request) -> str | None:
 async def get_current_user(request: Request) -> AuthUser:
     """FastAPI dependency — requires a valid Supabase JWT.
 
-    Usage:
-        @router.post("/something")
-        async def endpoint(user: AuthUser = Depends(get_current_user)):
-            ...
+    Uses the Supabase admin client to verify the token, which works
+    with both legacy (HS256) and new (EdDSA) key formats.
     """
     token = _extract_token(request)
     if not token:
         raise HTTPException(401, "Missing Authorization header")
 
     try:
-        payload = jwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-        )
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(401, "Token expired")
-    except jwt.InvalidTokenError as e:
+        user_response = get_supabase().auth.get_user(token)
+        user = user_response.user
+        if not user:
+            raise HTTPException(401, "Invalid token")
+        return AuthUser(id=str(user.id), email=user.email or "")
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(401, f"Invalid token: {e}")
-
-    user_id = payload.get("sub")
-    email = payload.get("email", "")
-    if not user_id:
-        raise HTTPException(401, "Token missing sub claim")
-
-    return AuthUser(id=user_id, email=email)
 
 
 async def optional_user(request: Request) -> AuthUser | None:

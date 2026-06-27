@@ -43,6 +43,9 @@ yarn-error.log*
 /data/subprocessor-update.md
 /data/subprocessor-update.txt
 
+# supabase
+.supabase/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

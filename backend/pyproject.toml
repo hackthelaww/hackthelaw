@@ -17,6 +17,8 @@ dependencies = [
     "python-multipart>=0.0.9", # file uploads in FastAPI
     "supabase>=2.0",           # Supabase Python client
     "pyjwt[crypto]>=2.8",     # JWT decoding for Supabase Auth
+    "pytesseract>=0.3",       # OCR for image documents
+    "Pillow>=10.0",           # Image processing for OCR
 ]
 
 [project.optional-dependencies]
