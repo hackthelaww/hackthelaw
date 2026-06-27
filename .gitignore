@@ -37,6 +37,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# real client documents you drop in locally — likely confidential, never auto-committed
+/data/contract.md
+/data/contract.txt
+/data/subprocessor-update.md
+/data/subprocessor-update.txt
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

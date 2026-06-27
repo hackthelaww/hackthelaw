@@ -8,7 +8,7 @@ import { retrieveProvisions, retrieveAllPlaybookRules } from "@/lib/agent/retrie
 import { analyzeClause } from "@/lib/agent/analyze";
 import { MODELS } from "@/lib/perplexity";
 
-const ROOT = resolve(__dirname, "..", "..");
+const ROOT = process.cwd();
 const CANDIDATE_FILES = ["data/subprocessor-update.md", "data/subprocessor-update.txt"];
 
 export function findNewInformationFile(): string | null {
