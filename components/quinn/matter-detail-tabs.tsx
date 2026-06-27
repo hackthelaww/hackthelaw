@@ -7,6 +7,7 @@ import { EntityList } from "@/components/quinn/entity-list";
 import { MatterBoard } from "@/components/quinn/matter-board";
 import { CaseTimeline } from "@/components/quinn/case-timeline";
 import { MatterOverview } from "@/components/quinn/matter-overview";
+import { CaseIntelligence } from "@/components/quinn/case-intelligence";
 import type { ClauseWithFinding, MatterTimeRange } from "@/lib/graph/queries";
 
 const BackendGraph = dynamic(
@@ -21,7 +22,7 @@ const BackendGraph = dynamic(
   }
 );
 
-type Tab = "timeline" | "overview" | "entities" | "graph" | "clauses";
+type Tab = "timeline" | "overview" | "intelligence" | "entities" | "graph" | "clauses";
 
 export function MatterDetailTabs({
   matterId,
@@ -50,6 +51,9 @@ export function MatterDetailTabs({
           <TabsTrigger value="overview">
             Overview
           </TabsTrigger>
+          <TabsTrigger value="intelligence">
+            Intelligence
+          </TabsTrigger>
           <TabsTrigger value="entities">
             Entities
           </TabsTrigger>
@@ -70,6 +74,8 @@ export function MatterDetailTabs({
       </Tabs>
 
       {tab === "overview" && <MatterOverview matterId={matterId} />}
+
+      {tab === "intelligence" && <CaseIntelligence matterId={matterId} />}
 
       {tab === "timeline" && <CaseTimeline matterId={matterId} />}
 

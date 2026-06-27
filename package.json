@@ -11,7 +11,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "ingest": "tsx scripts/ingest.ts",
-    "reset": "tsx scripts/reset.ts"
+    "reset": "tsx scripts/reset.ts",
+    "backfill-embeddings": "tsx scripts/backfill-embeddings.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

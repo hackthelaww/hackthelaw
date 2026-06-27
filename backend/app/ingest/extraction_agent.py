@@ -15,6 +15,7 @@ import time
 from strands import Agent, tool
 
 from app.db import write_query, write_query_sync
+from app.embeddings import embed_text_sync
 
 # ---------------------------------------------------------------------------
 # Run-scoped state (set before each agent invocation)
@@ -91,6 +92,14 @@ def add_entity(entity_type: str, name: str, properties: dict) -> str:
             clean_props[k] = json.dumps(v)
         else:
             clean_props[k] = v
+
+    # Real semantic embedding — best available text, falling back to the entity
+    # name. None (no PERPLEXITY_API_KEY configured) is fine: the entity is just
+    # not yet semantically searchable, extraction itself never fails over this.
+    embed_source = properties.get("text") or properties.get("description") or name
+    embedding = embed_text_sync(f"{name}\n\n{embed_source}")
+    if embedding is not None:
+        clean_props["embedding"] = embedding
 
     set_parts = ", ".join(f"n.{k} = ${k}" for k in clean_props)
 

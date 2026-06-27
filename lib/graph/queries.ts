@@ -146,6 +146,33 @@ export async function getMatterDetail(matterId: string): Promise<MatterDetail | 
   };
 }
 
+export interface EntitySummary {
+  total: number;
+  byType: Record<string, number>;
+}
+
+/**
+ * Counts the generic `:Entity` nodes the Python extraction backend writes for live
+ * document uploads, by entity_type — the platform isn't only DPA-clause-review anymore,
+ * so a matter's "progress" may live here instead of (or alongside) Clause/Finding data.
+ */
+export async function getMatterEntitySummary(matterId: string): Promise<EntitySummary> {
+  const records = await runRead(
+    `MATCH (e:Entity)-[:BELONGS_TO]->(:Matter {id: $matterId})
+     RETURN e.entity_type AS type, count(*) AS count
+     ORDER BY count DESC`,
+    { matterId }
+  );
+  const byType: Record<string, number> = {};
+  let total = 0;
+  for (const rec of records) {
+    const count = toNumber(rec.get("count"));
+    byType[rec.get("type") as string] = count;
+    total += count;
+  }
+  return { total, byType };
+}
+
 export interface MatterTimeRange {
   earliest: number | null;
   latest: number | null;
