@@ -1,69 +1,98 @@
 import { runRead } from "@/lib/neo4j";
+import { embedOne, cosineSimilarity } from "@/lib/embeddings";
 
 export interface Citation {
-  type: "clause" | "matter" | "provision" | "playbookRule" | "episode";
+  type: "clause" | "matter" | "provision" | "playbookRule" | "episode" | "entity";
   id: string;
   label: string;
 }
 
-export interface ClauseHit {
-  matterId: string;
-  matterName: string;
-  clauseId: string;
-  ref: string;
-  heading: string;
-  status: string | null;
-  summary: string | null;
+const SEMANTIC_TOP_K = 10;
+const SNIPPET_LENGTH = 280;
+
+export interface GraphHit {
+  /** e.g. "Clause", "GDPR Provision", "Playbook Rule", or the entity_type the extraction
+   *  agent picked ("Obligation", "Remedy", "Party", etc.) — whatever the node actually is. */
+  type: string;
+  /** null for matter-independent nodes (Provision, PlaybookRule). */
+  matterName: string | null;
+  id: string;
+  title: string;
+  snippet: string;
 }
 
-function clauseCitation(h: ClauseHit): Citation {
-  return { type: "clause", id: h.clauseId, label: `${h.matterName} — clause ${h.ref}` };
+function graphHitCitation(h: GraphHit): Citation {
+  const label = h.matterName ? `${h.matterName} — ${h.type}: ${h.title}` : `${h.type}: ${h.title}`;
+  return { type: "entity", id: h.id, label };
 }
 
-/** "Which clauses rely on GDPR Article 28?" */
-export async function queryByProvisionArticle(article: string): Promise<{ hits: ClauseHit[]; citations: Citation[] }> {
-  const records = await runRead(
-    `MATCH (p:Provision {article: $article})<-[:RELIES_ON]-(f:Finding)<-[r:ASSESSED_AS]-(c:Clause)
-     WHERE r.expiredAt IS NULL
-     MATCH (m:Matter {id: c.matterId})
-     RETURN m.id AS matterId, m.name AS matterName, c.id AS clauseId, c.ref AS ref, c.heading AS heading,
-            f.status AS status, f.summary AS summary`,
-    { article }
-  );
-  const hits = records.map(toClauseHit);
+function toGraphHit(rec: import("neo4j-driver").Record): GraphHit {
+  const snippet = (rec.get("snippet") as string) ?? "";
   return {
-    hits,
-    citations: [
-      { type: "provision", id: `gdpr-art-${article}`, label: `GDPR Article ${article}` },
-      ...hits.map(clauseCitation),
-    ],
+    type: rec.get("type"),
+    matterName: rec.get("matterName"),
+    id: rec.get("id"),
+    title: rec.get("title"),
+    snippet: snippet.length > SNIPPET_LENGTH ? `${snippet.slice(0, SNIPPET_LENGTH)}…` : snippet,
   };
 }
 
-/** "Which of my open matters touch sub-processor obligations?" — keyword over playbook rules + clause text. */
-export async function queryByKeyword(keyword: string): Promise<{ hits: ClauseHit[]; citations: Citation[] }> {
-  const records = await runRead(
-    `MATCH (c:Clause)
-     WHERE toLower(c.text) CONTAINS toLower($keyword) OR toLower(c.heading) CONTAINS toLower($keyword)
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((v) =>
+    typeof v === "number"
+      ? v
+      : typeof (v as { toNumber?: () => number })?.toNumber === "function"
+        ? (v as { toNumber: () => number }).toNumber()
+        : Number(v ?? 0)
+  );
+}
+
+/**
+ * Every embedded node in the graph — Clause, Entity (any entity_type), Provision,
+ * PlaybookRule — in one shape, regardless of which pipeline wrote it (the TS static
+ * ingest or the Python live-document extraction backend, which use different property
+ * schemas — see RETURN clauses below).
+ */
+async function fetchAllEmbeddedNodes() {
+  return runRead(
+    `MATCH (c:Clause) WHERE c.embedding IS NOT NULL
      MATCH (m:Matter {id: c.matterId})
-     OPTIONAL MATCH (c)-[r:ASSESSED_AS]->(f:Finding) WHERE r.expiredAt IS NULL
-     RETURN m.id AS matterId, m.name AS matterName, c.id AS clauseId, c.ref AS ref, c.heading AS heading,
-            f.status AS status, f.summary AS summary`,
-    { keyword }
+     RETURN 'Clause' AS type, m.name AS matterName, c.id AS id, c.heading AS title, c.text AS snippet, c.embedding AS embedding
+     UNION
+     MATCH (n:Entity) WHERE n.embedding IS NOT NULL
+     MATCH (m:Matter {id: n.matter_id})
+     RETURN n.entity_type AS type, m.name AS matterName, n.id AS id, n.name AS title,
+            coalesce(n.description, n.verbatim_text, '') AS snippet, n.embedding AS embedding
+     UNION
+     MATCH (p:Provision) WHERE p.embedding IS NOT NULL
+     RETURN 'GDPR Provision' AS type, null AS matterName, p.id AS id, p.title AS title, p.text AS snippet, p.embedding AS embedding
+     UNION
+     MATCH (r:PlaybookRule) WHERE r.embedding IS NOT NULL
+     RETURN 'Playbook Rule' AS type, null AS matterName, r.id AS id, r.title AS title, r.requirement AS snippet, r.embedding AS embedding`
   );
-  const ruleRecords = await runRead(
-    `MATCH (r:PlaybookRule)
-     WHERE toLower(r.title) CONTAINS toLower($keyword) OR toLower(r.requirement) CONTAINS toLower($keyword)
-     RETURN r.id AS id, r.title AS title`,
-    { keyword }
-  );
-  const hits = records.map(toClauseHit);
+}
+
+/**
+ * The chat's only retrieval mechanism: embed the question, rank every embedded node in
+ * the graph (any matter, any node type) by cosine similarity, return the top K. No
+ * keyword/regex routing — this is what the LLM is given to answer from, and ONLY this;
+ * it's told explicitly to say so if nothing relevant comes back rather than guess.
+ */
+export async function querySemanticGraph(question: string): Promise<{ hits: GraphHit[]; citations: Citation[]; topScore: number }> {
+  const queryVector = await embedOne(question);
+  const records = await fetchAllEmbeddedNodes();
+
+  const scored = records
+    .map((rec) => ({ hit: toGraphHit(rec), score: cosineSimilarity(queryVector, toNumberArray(rec.get("embedding"))) }))
+    .sort((a, b) => b.score - a.score);
+
+  const ranked = scored.slice(0, SEMANTIC_TOP_K).map((r) => r.hit);
+
   return {
-    hits,
-    citations: [
-      ...ruleRecords.map((r) => ({ type: "playbookRule" as const, id: r.get("id"), label: r.get("title") })),
-      ...hits.map(clauseCitation),
-    ],
+    hits: ranked,
+    citations: ranked.map(graphHitCitation),
+    topScore: scored[0]?.score ?? 0,
   };
 }
 
@@ -106,17 +135,5 @@ export async function queryRecentChanges(sinceMs: number, matterId?: string): Pr
   return {
     hits,
     citations: hits.map((h) => ({ type: "clause", id: h.clauseId, label: `${h.matterName} — clause ${h.ref}` })),
-  };
-}
-
-function toClauseHit(rec: import("neo4j-driver").Record): ClauseHit {
-  return {
-    matterId: rec.get("matterId"),
-    matterName: rec.get("matterName"),
-    clauseId: rec.get("clauseId"),
-    ref: rec.get("ref"),
-    heading: rec.get("heading"),
-    status: rec.get("status"),
-    summary: rec.get("summary"),
   };
 }

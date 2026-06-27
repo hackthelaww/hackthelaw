@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gcs_bucket: str = ""
 
+    # Real semantic search — same Perplexity embeddings endpoint the Next.js side uses
+    perplexity_api_key: str = ""
+
     # Supabase
     supabase_url: str = ""
     supabase_publishable_key: str = ""

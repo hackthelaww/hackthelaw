@@ -2,7 +2,6 @@ import Link from "next/link";
 import { listMattersOverview, type MatterOverview } from "@/lib/graph/queries";
 import { getUserMatterSlugs } from "@/lib/supabase/cases";
 import { SidebarMatterList } from "@/components/quinn/sidebar-matter-list";
-import { ChatPanel } from "@/components/quinn/chat-panel";
 import { SignOutButton } from "@/components/quinn/sign-out-button";
 import { Search } from "lucide-react";
 
@@ -75,7 +74,6 @@ export async function AppSidebar() {
         >
           Backend demo
         </Link>
-        <ChatPanel />
         <SignOutButton />
       </div>
     </aside>

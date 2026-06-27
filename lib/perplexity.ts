@@ -46,6 +46,26 @@ export async function complete(
   return (response as any).output_text ?? "";
 }
 
+/** Streaming text completion — yields output text deltas as they arrive. */
+export async function* completeStream(
+  input: string,
+  opts: { model?: string; maxOutputTokens?: number } = {}
+): AsyncGenerator<string, void, unknown> {
+  const stream = await getClient().responses.create({
+    model: opts.model ?? MODELS.fast,
+    input,
+    max_output_tokens: opts.maxOutputTokens,
+    stream: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for await (const event of stream as any) {
+    if (event?.type === "response.output_text.delta" && typeof event.delta === "string") {
+      yield event.delta;
+    }
+  }
+}
+
 /** Strict-JSON completion via Perplexity's response_format / json_schema mechanism. */
 export async function completeJSON<T>(
   input: string,

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { runWrite } from "@/lib/neo4j";
+import { embedOne } from "@/lib/embeddings";
 import type { FetchedProvision } from "@/lib/ingest/cellar";
 import type { ParsedClause } from "@/lib/ingest/clauseParser";
 
@@ -43,10 +44,12 @@ export async function mentions(episodeId: string, nodeLabel: string, nodeId: str
 
 export async function writeProvision(p: FetchedProvision, episodeId: string): Promise<string> {
   const id = `gdpr-art-${p.article}`;
+  const embedding = await embedOne(`${p.title}\n\n${p.text}`);
   await runWrite(
     `MERGE (p:Provision {id: $id})
-     SET p.celex = $celex, p.article = $article, p.title = $title, p.text = $text, p.source = $source`,
-    { id, celex: p.celex, article: p.article, title: p.title, text: p.text, source: p.source }
+     SET p.celex = $celex, p.article = $article, p.title = $title, p.text = $text, p.source = $source,
+         p.embedding = $embedding`,
+    { id, celex: p.celex, article: p.article, title: p.title, text: p.text, source: p.source, embedding }
   );
   await mentions(episodeId, "Provision", id);
   return id;
@@ -60,10 +63,11 @@ export interface PlaybookRuleInput {
 
 export async function writePlaybookRule(rule: PlaybookRuleInput, episodeId: string): Promise<string> {
   const id = rule.code;
+  const embedding = await embedOne(`${rule.title}\n\n${rule.requirement}`);
   await runWrite(
     `MERGE (r:PlaybookRule {id: $id})
-     SET r.code = $code, r.title = $title, r.requirement = $requirement`,
-    { id, code: rule.code, title: rule.title, requirement: rule.requirement }
+     SET r.code = $code, r.title = $title, r.requirement = $requirement, r.embedding = $embedding`,
+    { id, code: rule.code, title: rule.title, requirement: rule.requirement, embedding }
   );
   await mentions(episodeId, "PlaybookRule", id);
   return id;
@@ -110,10 +114,11 @@ export async function writeClause(
   episodeId: string
 ): Promise<string> {
   const id = `${matterId}::clause::${slugify(clause.ref)}`;
+  const embedding = await embedOne(`${clause.heading}\n\n${clause.text}`);
   await runWrite(
     `MERGE (c:Clause {id: $id})
-     SET c.ref = $ref, c.heading = $heading, c.text = $text, c.matterId = $matterId`,
-    { id, ref: clause.ref, heading: clause.heading, text: clause.text, matterId }
+     SET c.ref = $ref, c.heading = $heading, c.text = $text, c.matterId = $matterId, c.embedding = $embedding`,
+    { id, ref: clause.ref, heading: clause.heading, text: clause.text, matterId, embedding }
   );
   await mentions(episodeId, "Clause", id);
   return id;
