@@ -126,8 +126,8 @@ export async function getMatterDetail(matterId: string): Promise<MatterDetail | 
       consequenceScore: rec.get("consequenceScore"),
       triageScore,
       lane: triageScore === null ? "unassessed" : laneFor(triageScore),
-      validAt: rec.get("validAt"),
-      createdAt: rec.get("createdAt"),
+      validAt: toNumber(rec.get("validAt")) || null,
+      createdAt: toNumber(rec.get("createdAt")) || null,
       latestReviewDecision: rec.get("latestReviewDecision"),
     };
   });
@@ -153,8 +153,8 @@ export async function getMatterTimeRange(matterId: string): Promise<MatterTimeRa
   );
   if (records.length === 0) return { earliest: null, latest: null };
   return {
-    earliest: records[0].get("earliest"),
-    latest: records[0].get("latest"),
+    earliest: toNumber(records[0].get("earliest")) || null,
+    latest: toNumber(records[0].get("latest")) || null,
   };
 }
 
