@@ -110,10 +110,10 @@ export function MatterBoard({
       )}
 
       <div className="flex items-center justify-between gap-2 border-b pb-3">
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
-          <span>{clauses.length} clauses</span>
-          <span>·</span>
-          <span>{clauses.filter((c) => c.latestReviewDecision).length} decided</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            {clauses.length} clauses · {clauses.filter((c) => c.latestReviewDecision).length} decided
+          </span>
           <Tabs
             value={view}
             onValueChange={(v) => {
@@ -122,17 +122,17 @@ export function MatterBoard({
               if (next === "graph") setLiveGraphAt(Date.now());
             }}
           >
-            <TabsList>
+            <TabsList variant="line">
               <TabsTrigger value="list">List</TabsTrigger>
               <TabsTrigger value="graph">Graph</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
         {isLive && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <NewInformationButton matterId={matterId} clauses={clauses} onApplied={handleNewInformationApplied} />
             <Select value={model} onValueChange={(v) => setModel((v ?? "fast") as "fast" | "reasoning")}>
-              <SelectTrigger size="sm" className="w-[150px]">
+              <SelectTrigger size="sm" className="w-auto border-none text-xs text-muted-foreground shadow-none">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -160,11 +160,17 @@ export function MatterBoard({
               return (
                 <div
                   key={lane}
-                  className={lane === "needs_judgement" ? "border-l-2 border-attention pl-3" : "pl-3"}
+                  className={lane === "needs_judgement" ? "border-l-2 border-foreground pl-3" : "pl-3"}
                 >
                   <div className="pt-4 pb-1">
-                    <h2 className="font-heading text-base text-foreground">
-                      {meta.label} <span className="font-sans text-sm text-muted-foreground">({items.length})</span>
+                    <h2
+                      className={
+                        lane === "needs_judgement"
+                          ? "text-base font-semibold text-foreground"
+                          : "text-base font-medium text-foreground"
+                      }
+                    >
+                      {meta.label} <span className="font-normal text-sm text-muted-foreground">({items.length})</span>
                     </h2>
                     <p className="text-xs text-muted-foreground">{meta.hint}</p>
                   </div>
@@ -183,12 +189,12 @@ export function MatterBoard({
             })}
           </div>
 
-          <div className="min-h-[480px] flex-1 rounded-md border lg:sticky lg:top-4 lg:h-[calc(100vh-8rem)]">
+          <div className="min-h-[480px] flex-1 lg:sticky lg:top-4 lg:h-[calc(100vh-8rem)] lg:border-l lg:pl-6">
             <ClauseDetailPanel clause={selected} onDecided={handleDecided} readOnly={!isLive} />
           </div>
         </div>
       ) : (
-        <div className="h-[calc(100vh-12rem)] rounded-md border">
+        <div className="h-[calc(100vh-12rem)] border-t">
           <MatterGraph matterId={matterId} viewingAt={historical?.viewingAt ?? liveGraphAt} />
         </div>
       )}
@@ -216,12 +222,14 @@ function ClauseRow({
         selected ? "bg-muted/60" : ""
       }`}
     >
-      <StatusDot tone={statusMeta?.dot ?? "unclear"} />
+      <StatusDot tone={statusMeta?.dot ?? "outline"} />
       <span className="shrink-0 font-mono text-xs uppercase tracking-wide text-muted-foreground">
         {clause.ref}
       </span>
       <div className="min-w-0 flex-1">
-        <span className="truncate text-sm text-foreground">{clause.heading}</span>
+        <span className={`truncate text-sm text-foreground ${statusMeta?.dot === "urgent" ? "font-semibold" : ""}`}>
+          {clause.heading}
+        </span>
         {decisionMeta && <span className="ml-2 text-xs text-muted-foreground">{decisionMeta.label}</span>}
       </div>
       {clause.confidence !== null && (

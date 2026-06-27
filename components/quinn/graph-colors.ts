@@ -1,53 +1,42 @@
 /**
- * Hex equivalents of the oklch design tokens in app/globals.css, computed
- * once — NVL's renderer takes literal color strings, not CSS variables.
+ * Pure neutral grayscale — no hue, matching app/globals.css's black/white
+ * design system. Node type is distinguished by fill shade + size, urgency
+ * (partial/non-compliant findings) by going darkest, same weight-not-color
+ * convention as status-dot.tsx.
  */
 const LIGHT = {
-  primary: "#23344a",
-  attention: "#c9892b",
-  compliant: "#467748",
-  partial: "#bf801e",
-  noncompliant: "#a03f3c",
-  unclear: "#77706b",
-  mutedForeground: "#69625b",
-  border: "#e2ddd9",
-  card: "#fefcfa",
+  black: "#060606",
+  dark: "#333333",
+  mid: "#717171",
+  light: "#d1d1d1",
+  edge: "#cecece",
 };
 
 const DARK = {
-  primary: "#9fbade",
-  attention: "#d6963b",
-  compliant: "#679f69",
-  partial: "#d6963b",
-  noncompliant: "#db6c66",
-  unclear: "#98918b",
-  mutedForeground: "#98918b",
-  border: "#484848",
-  card: "#1f1b17",
+  black: "#e8e8e8",
+  dark: "#9e9e9e",
+  mid: "#636363",
+  light: "#484848",
+  edge: "#484848",
 };
 
 type Palette = typeof LIGHT;
 
-const FINDING_STATUS_KEY: Record<string, keyof Palette> = {
-  compliant: "compliant",
-  partially_compliant: "partial",
-  non_compliant: "noncompliant",
-  unclear: "unclear",
-};
+const ATTENTION_STATUSES = new Set(["partially_compliant", "non_compliant"]);
 
 export function colorForNode(palette: Palette, label: string, status?: string | null): string {
   switch (label) {
     case "Matter":
-      return palette.primary;
+      return palette.black;
     case "Finding":
-      return palette[status ? FINDING_STATUS_KEY[status] ?? "unclear" : "unclear"];
+      return status && ATTENTION_STATUSES.has(status) ? palette.black : palette.mid;
     case "PlaybookRule":
-      return palette.attention;
+      return palette.mid;
     case "Review":
     case "SignOff":
-      return palette.primary;
+      return palette.dark;
     default:
-      return palette.mutedForeground;
+      return palette.light;
   }
 }
 

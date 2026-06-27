@@ -162,7 +162,7 @@ export function ClauseDetailPanel({
                 <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Deviates from firm playbook</h3>
                 <div className="space-y-2">
                   {trace.deviations.map((d, i) => (
-                    <div key={i} className="rounded-md border-l-2 border-attention bg-muted/40 p-3 text-sm">
+                    <div key={i} className="rounded-md border-l-2 border-foreground bg-muted/40 p-3 text-sm">
                       <div className="font-medium">
                         [{d.rule.code}] {d.rule.title}
                       </div>

@@ -17,7 +17,7 @@ const LABEL_LEGEND: { label: GraphNode["label"]; description: string }[] = [
   { label: "Matter", description: "The matter itself" },
   { label: "Party", description: "Counterparties" },
   { label: "Clause", description: "A clause in the document" },
-  { label: "Finding", description: "Current assessment, colored by status" },
+  { label: "Finding", description: "Current assessment — solid if it needs your judgement" },
   { label: "Provision", description: "Real GDPR article relied on" },
   { label: "PlaybookRule", description: "Firm rule a finding deviates from" },
   { label: "Review", description: "A partner's decision" },
@@ -67,8 +67,7 @@ export function MatterGraph({ matterId, viewingAt }: { matterId: string; viewing
       id: e.id,
       from: e.from,
       to: e.to,
-      caption: e.type,
-      color: palette.border,
+      color: palette.edge,
     }));
     return { nodes, rels };
   }, [data, palette]);

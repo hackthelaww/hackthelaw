@@ -23,9 +23,9 @@ export default async function ControlTowerPage() {
   const totalNeedsAttention = matters.reduce((sum, m) => sum + m.needsJudgementCount, 0);
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-8 py-12">
+    <main className="mx-auto w-full max-w-3xl px-10 py-12">
       <div className="mb-10">
-        <h1 className="font-heading text-3xl text-foreground">Quinn</h1>
+        <h1 className="font-heading text-2xl font-semibold tracking-tight text-foreground">Matters</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Allocating your attention to the AI outputs where your judgement changes the outcome.
         </p>
@@ -56,7 +56,10 @@ export default async function ControlTowerPage() {
               {totalNeedsAttention > 0 && (
                 <>
                   {" "}
-                  · <span className="text-attention-foreground">{totalNeedsAttention} item{totalNeedsAttention === 1 ? "" : "s"} need you</span>
+                  ·{" "}
+                  <span className="font-semibold text-foreground">
+                    {totalNeedsAttention} item{totalNeedsAttention === 1 ? "" : "s"} need you
+                  </span>
                 </>
               )}
             </span>
@@ -72,12 +75,14 @@ export default async function ControlTowerPage() {
                     href={`/matters/${m.id}`}
                     className="flex items-center gap-4 py-4 transition-colors hover:bg-muted/40"
                   >
-                    <StatusDot tone={needsAttention ? "attention" : "neutral"} className="size-2 shrink-0" />
+                    <StatusDot tone={needsAttention ? "urgent" : "outline"} className="size-2 shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-heading text-base text-foreground">{m.name}</span>
+                        <span className={needsAttention ? "font-semibold text-foreground" : "text-foreground"}>
+                          {m.name}
+                        </span>
                         {needsAttention && (
-                          <span className="text-xs font-medium text-attention-foreground">
+                          <span className="text-xs font-medium text-foreground">
                             {m.needsJudgementCount} need{m.needsJudgementCount === 1 ? "s" : ""} you
                           </span>
                         )}

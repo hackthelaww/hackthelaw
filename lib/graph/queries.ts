@@ -38,8 +38,9 @@ export async function listMattersOverview(): Promise<MatterOverview[]> {
     let lastUpdatedAt: number | null = null;
     for (const a of assessments) {
       lanesCounts[laneFor(a.triageScore as number)]++;
-      if (a.createdAt !== null && (lastUpdatedAt === null || a.createdAt > lastUpdatedAt)) {
-        lastUpdatedAt = a.createdAt;
+      const createdAt = a.createdAt === null ? null : toNumber(a.createdAt);
+      if (createdAt !== null && (lastUpdatedAt === null || createdAt > lastUpdatedAt)) {
+        lastUpdatedAt = createdAt;
       }
     }
 

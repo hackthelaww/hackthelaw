@@ -11,6 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, FileWarning } from "lucide-react";
 import { toast } from "sonner";
 import type { ClauseWithFinding } from "@/lib/graph/queries";
@@ -56,10 +57,16 @@ export function NewInformationButton({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <FileWarning className="size-4" />
-        New information arrives
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button size="icon-sm" variant="ghost" onClick={() => setOpen(true)} aria-label="New information arrives">
+              <FileWarning className="size-4" />
+            </Button>
+          }
+        />
+        <TooltipContent>New information arrives</TooltipContent>
+      </Tooltip>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New information arrives</DialogTitle>

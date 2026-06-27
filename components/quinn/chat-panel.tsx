@@ -60,14 +60,13 @@ export function ChatPanel() {
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <Button
+      <button
         onClick={() => setOpen(true)}
-        variant="default"
-        className="fixed bottom-6 right-6 z-40 rounded-full px-4 shadow-lg"
+        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
       >
         <MessageCircle className="size-4" />
         Ask Quinn
-      </Button>
+      </button>
       <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="font-heading text-lg">Ask Quinn</SheetTitle>
