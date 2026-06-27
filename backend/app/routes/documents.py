@@ -32,6 +32,28 @@ def _now_ms() -> int:
     return int(time.time() * 1000)
 
 
+def _resolve_doc_uuid(doc_id: str) -> str | None:
+    """Resolve a document ID (UUID or Neo4j ID) to a Supabase case_documents UUID."""
+    if not doc_id:
+        return None
+    sb = get_supabase()
+    # Try as UUID first
+    try:
+        r = sb.table("case_documents").select("id").eq("id", doc_id).maybe_single().execute()
+        if r and r.data:
+            return r.data["id"]
+    except Exception:
+        pass
+    # Try as Neo4j document ID
+    try:
+        r = sb.table("case_documents").select("id").eq("neo4j_document_id", doc_id).maybe_single().execute()
+        if r and r.data:
+            return r.data["id"]
+    except Exception:
+        pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Step 1: Upload — extract text, store file, return preview
 # ---------------------------------------------------------------------------
@@ -178,7 +200,7 @@ async def upload_document(
                 "uploaded_by": user.id,
                 "similarity_status": ("evolved_version" if semantic_match and semantic_match.relationship == "evolved_version" else similarity.status) if similarity else "new",
                 "similarity_score": similarity.score if similarity else None,
-                "similarity_parent_id": similarity.matched_document_id if similarity else None,
+                "similarity_parent_id": _resolve_doc_uuid(similarity.matched_document_id) if similarity and similarity.matched_document_id else None,
                 "semantic_explanation": semantic_match.explanation if semantic_match else "",
                 "semantic_key_changes": semantic_match.key_changes if semantic_match else [],
             }
@@ -383,15 +405,18 @@ async def extract_document(document_id: str, body: ExtractRequest, user: AuthUse
     case_uuid = get_case_uuid_by_slug(matter_id)
     sb_doc = None
     if case_uuid:
-        sb_result = (
-            get_supabase()
-            .table("case_documents")
-            .select("id")
-            .eq("neo4j_document_id", document_id)
-            .maybe_single()
-            .execute()
-        )
-        sb_doc = sb_result.data
+        try:
+            sb_result = (
+                get_supabase()
+                .table("case_documents")
+                .select("id")
+                .eq("neo4j_document_id", document_id)
+                .maybe_single()
+                .execute()
+            )
+            sb_doc = sb_result.data if sb_result else None
+        except Exception:
+            sb_doc = None
 
     # Update extraction status to 'processing'
     if sb_doc:
@@ -556,24 +581,50 @@ class LinkVersionRequest(BaseModel):
 
 @router.post("/link-version")
 async def link_as_version(body: LinkVersionRequest, user: AuthUser = Depends(get_current_user)) -> dict:
-    """Link a near-duplicate document as a new version of an existing document."""
-    parent = (
-        get_supabase()
-        .table("case_documents")
-        .select("version_number")
-        .eq("id", body.parent_document_id)
-        .single()
-        .execute()
-    )
-    if not parent.data:
+    """Link a near-duplicate document as a new version of an existing document.
+
+    Accepts both Supabase UUIDs and Neo4j document IDs — resolves automatically.
+    """
+    sb = get_supabase()
+
+    def resolve_to_uuid(doc_id: str) -> str | None:
+        """Try as UUID first, then as neo4j_document_id."""
+        try:
+            r = sb.table("case_documents").select("id, version_number").eq("id", doc_id).maybe_single().execute()
+            if r and r.data:
+                return r.data["id"]
+        except Exception:
+            pass
+        try:
+            r = sb.table("case_documents").select("id, version_number").eq("neo4j_document_id", doc_id).maybe_single().execute()
+            if r and r.data:
+                return r.data["id"]
+        except Exception:
+            pass
+        return None
+
+    parent_uuid = resolve_to_uuid(body.parent_document_id)
+    new_uuid = resolve_to_uuid(body.new_document_id)
+
+    if not parent_uuid:
         raise HTTPException(404, "Parent document not found")
+    if not new_uuid:
+        raise HTTPException(404, "New document not found")
 
-    new_version = (parent.data.get("version_number") or 1) + 1
+    # Get parent version number
+    try:
+        parent = sb.table("case_documents").select("version_number").eq("id", parent_uuid).single().execute()
+        new_version = (parent.data.get("version_number") or 1) + 1 if parent.data else 2
+    except Exception:
+        new_version = 2
 
-    get_supabase().table("case_documents").update({
-        "parent_document_id": body.parent_document_id,
-        "version_number": new_version,
-    }).eq("id", body.new_document_id).execute()
+    try:
+        sb.table("case_documents").update({
+            "parent_document_id": parent_uuid,
+            "version_number": new_version,
+        }).eq("id", new_uuid).execute()
+    except Exception as e:
+        raise HTTPException(500, f"Failed to link version: {e}")
 
     return {"linked": True, "version_number": new_version}
 
@@ -645,6 +696,76 @@ async def get_document_diff(document_id: str) -> dict:
         "original_chars": len(parent_text),
         "new_chars": len(new_text),
     }
+
+
+# ---------------------------------------------------------------------------
+# Annotations — AI-generated review notes for document comparisons
+# ---------------------------------------------------------------------------
+
+@router.get("/{document_id}/annotations")
+async def get_annotations(document_id: str) -> dict:
+    """Get AI annotations for a document. Generates on-demand if not cached."""
+    sb = get_supabase()
+
+    # Check if annotations are already cached
+    doc_result = (
+        sb.table("case_documents")
+        .select("id, annotations, similarity_status, similarity_parent_id, neo4j_document_id")
+        .eq("id", document_id)
+        .maybe_single()
+        .execute()
+    )
+    if not doc_result or not doc_result.data:
+        raise HTTPException(404, "Document not found")
+
+    doc = doc_result.data
+
+    # Return cached annotations if available
+    if doc.get("annotations"):
+        return {"annotations": doc["annotations"], "cached": True}
+
+    # Generate on-demand if this is a near-duplicate or evolved version
+    parent_id = doc.get("similarity_parent_id")
+    if not parent_id:
+        return {"annotations": [], "cached": False, "reason": "No parent document to compare against"}
+
+    # Fetch parent's Neo4j doc ID
+    parent_result = (
+        sb.table("case_documents")
+        .select("neo4j_document_id")
+        .eq("id", parent_id)
+        .maybe_single()
+        .execute()
+    )
+    if not parent_result or not parent_result.data:
+        return {"annotations": [], "cached": False, "reason": "Parent document not found"}
+
+    # Fetch both document texts from Neo4j
+    async def get_text(neo4j_doc_id: str) -> str:
+        rows = await read_query(
+            "MATCH (d:Document {id: $did})-[:HAS_VERSION]->(v:Version) RETURN v.content AS content ORDER BY v.version_no DESC LIMIT 1",
+            {"did": neo4j_doc_id},
+        )
+        return rows[0]["content"] if rows else ""
+
+    new_text = await get_text(doc.get("neo4j_document_id", ""))
+    parent_text = await get_text(parent_result.data.get("neo4j_document_id", ""))
+
+    if not new_text or not parent_text:
+        return {"annotations": [], "cached": False, "reason": "Could not fetch document text"}
+
+    # Generate annotations
+    from app.ingest.annotation_agent import generate_annotations
+    annotations = generate_annotations(parent_text, new_text)
+
+    # Cache in Supabase
+    if annotations:
+        try:
+            sb.table("case_documents").update({"annotations": annotations}).eq("id", document_id).execute()
+        except Exception:
+            pass
+
+    return {"annotations": annotations, "cached": False}
 
 
 # ---------------------------------------------------------------------------

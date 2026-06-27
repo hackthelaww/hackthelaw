@@ -19,6 +19,7 @@ dependencies = [
     "pyjwt[crypto]>=2.8",     # JWT decoding for Supabase Auth
     "pytesseract>=0.3",       # OCR for image documents
     "Pillow>=10.0",           # Image processing for OCR
+    "voyageai>=0.3",          # Legal document embeddings
 ]
 
 [project.optional-dependencies]

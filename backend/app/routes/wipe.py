@@ -73,3 +73,58 @@ async def wipe_all() -> dict:
         "neo4j": neo4j_result,
         "supabase": supabase_result,
     }
+
+
+@router.delete("/hard-reset")
+async def hard_reset() -> dict:
+    """Nuclear option — wipe Neo4j, Supabase tables, Storage bucket, and all auth users."""
+    sb = get_supabase()
+
+    # 1. Neo4j
+    neo4j_result = await _wipe_neo4j()
+
+    # 2. Supabase tables
+    supabase_result = _wipe_supabase()
+
+    # 3. Summary history
+    try:
+        sb.table("case_summary_history").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+    except Exception:
+        pass
+
+    # 4. Storage bucket — delete all files
+    storage_deleted = 0
+    try:
+        files = sb.storage.from_("case-documents").list()
+        for folder in (files or []):
+            folder_name = folder.get("name", "")
+            if not folder_name:
+                continue
+            inner = sb.storage.from_("case-documents").list(folder_name)
+            for f in (inner or []):
+                path = f"{folder_name}/{f.get('name', '')}"
+                try:
+                    sb.storage.from_("case-documents").remove([path])
+                    storage_deleted += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 5. Delete all auth users
+    users_deleted = 0
+    try:
+        users = sb.auth.admin.list_users()
+        for u in users:
+            sb.auth.admin.delete_user(u.id)
+            users_deleted += 1
+    except Exception:
+        pass
+
+    return {
+        "wiped": "hard-reset",
+        "neo4j": neo4j_result,
+        "supabase": supabase_result,
+        "storage_files_deleted": storage_deleted,
+        "users_deleted": users_deleted,
+    }

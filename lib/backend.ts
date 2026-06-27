@@ -163,6 +163,7 @@ export interface TimelineBatch {
     uploaded_at: string;
     uploaded_by: string;
     uploaded_by_email: string;
+    source: string;
     similarity_status: string;
     similarity_score: number | null;
     similarity_parent_filename: string | null;
@@ -193,6 +194,23 @@ export async function getTimeline(slug: string): Promise<TimelineData> {
 export async function getDocumentContent(docId: string) {
   return request<{ content: string; title: string; filename: string }>(
     `/api/documents/${encodeURIComponent(docId)}/content`
+  );
+}
+
+export interface DocumentAnnotation {
+  id: string;
+  category: "issue" | "suggestion" | "strength" | "grammar" | "weak_argument" | "change";
+  severity: "high" | "medium" | "low";
+  text_span: string;
+  span_start: number;
+  span_end: number;
+  note: string;
+  quote: string;
+}
+
+export async function getAnnotations(docId: string) {
+  return request<{ annotations: DocumentAnnotation[]; cached: boolean }>(
+    `/api/documents/${encodeURIComponent(docId)}/annotations`
   );
 }
 

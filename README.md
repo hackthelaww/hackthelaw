@@ -76,6 +76,77 @@ meaningful mock. Fixtures are namespaced (`__test_temporal__`,
 backs up/restores `data/subprocessor-update.md` rather than risking a real
 file you've dropped in.
 
+## Document upload demo (pregnancy discrimination case)
+
+This demo walks through a 7-day case lifecycle using real test documents.
+Each day simulates a batch upload with the date picker in the upload dialog.
+
+### Prerequisites
+
+```bash
+# Start both servers
+npm run dev:full
+
+# Hard reset (wipes Neo4j + Supabase + Storage + all users)
+curl -X DELETE http://localhost:8000/api/wipe/hard-reset
+
+# Sign up fresh at http://localhost:3000/login
+```
+
+### Quick test (2 documents)
+
+Upload just these two files to verify the core flow works:
+
+1. Upload `~/Downloads/Day 1/Email_first.odt` (date: `2026-05-20`, source: Human)
+2. Upload `~/Downloads/Day 2/Email_proof.odt` (date: `2026-05-21`, source: Human)
+
+You should see: two batches in the timeline, entities extracted for both, click filenames to view content.
+
+### Full upload sequence
+
+| Day | Simulated date | Files to upload |
+|-----|---------------|-----------------|
+| 1 | `2026-05-20` | `~/Downloads/Day 1/Email_first.odt` |
+| 2 | `2026-05-21` | `~/Downloads/Day 2/Email_proof.odt`, `InternalMail.odt`, `Lawfirm_communication.odt`, `RatingSarah.odt` |
+| 3 | `2026-05-22` | `~/Downloads/Day 3/Restructing Announcement.odt`, `WrittenStatementMail.odt` |
+| 4 | `2026-05-23` | `~/Downloads/Day 4/Formal Complaint of Pregnancy Discrimination.docx` |
+| 5 | `2026-05-24` | `~/Downloads/Day 5/Formal_Complaint_of_Pregnancy_Discrimination.docx` |
+| 6 | `2026-05-25` | `~/Downloads/Day 6/LetterOfClaim_Mitchell_v_TechSolutions.pdf` |
+| 7 | `2026-05-26` | `~/Downloads/Day 7/N1_Mitchell_v_TechSolutions.pdf`, `Pleadings_Exchange_Mitchell_v_TechSolutions.pdf`, `Skeleton_Argument_Mitchell_v_TechSolutions.pdf` |
+
+After all 7 days, upload the evolved version to test semantic comparison + annotations:
+
+| Bonus | `2026-05-28` | `~/Downloads/Sarah Mitchell – Pregnancy Discrimination and Unfair Dismissal.docx` |
+
+### What to expect
+
+- **Day 5** — The system detects `Formal_Complaint_of_Pregnancy_Discrimination.docx` as an **exact duplicate** of Day 4's file (same content, renamed with underscores). It skips extraction automatically.
+- **Bonus upload** — The system detects the rewritten complaint as an **evolved version** of Day 4's original via LLM semantic comparison (only 15% text overlap, but same parties/matter/purpose). The annotation agent runs and produces inline review notes.
+- **Timeline tab** — Shows document batches in reverse chronological order. Click any filename to open the document viewer.
+- **Document viewer** — For evolved versions, shows the document text with colored inline highlights (legal issues, suggestions, strengths, grammar, changes) linked to post-it style annotation notes on the right sidebar.
+- **Entity flowchart** — The Entities tab groups extracted entities by source document, ordered by upload time.
+
+### API shortcuts
+
+```bash
+# Hard reset everything
+curl -X DELETE http://localhost:8000/api/wipe/hard-reset
+
+# Wipe only Neo4j
+curl -X DELETE http://localhost:8000/api/wipe/neo4j
+
+# Wipe only Supabase tables
+curl -X DELETE http://localhost:8000/api/wipe/supabase
+
+# Delete all users
+curl -X DELETE http://localhost:8000/api/users
+
+# Check health
+curl http://localhost:8000/health
+```
+
+---
+
 ## Demo script
 
 1. **Control tower** (`/`) — matters listed as cards; any matter with clauses

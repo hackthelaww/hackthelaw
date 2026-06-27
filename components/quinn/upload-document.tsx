@@ -16,7 +16,16 @@ import { createClient } from "@/lib/supabase/client";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:8000";
 
-type Step = "pick-files" | "source" | "processing" | "done";
+type Step = "pick-files" | "source" | "review-similar" | "processing" | "done";
+
+interface PendingFile {
+  index: number;
+  file: File;
+  uploadData: Record<string, unknown>;
+  similarity: SimilarityInfo | null;
+  semanticMatch: SemanticMatchInfo | null;
+  decision: "upload" | "skip" | "pending";
+}
 
 interface SimilarityInfo {
   status: string;
@@ -187,20 +196,24 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [files, setFiles] = useState<File[]>([]);
-  const [source, setSource] = useState<"human" | "ai" | null>(null);
+  const [fileSources, setFileSources] = useState<Record<number, "human" | "ai">>({});
   const [results, setResults] = useState<FileResult[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [simulatedDate, setSimulatedDate] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [matterId_internal, setMatterId_internal] = useState("");
 
   function reset() {
     setStep("pick-files");
     setError(null);
     setLoading(false);
     setFiles([]);
-    setSource(null);
+    setFileSources({});
     setResults([]);
     setCurrentIndex(0);
     setSimulatedDate("");
+    setPendingFiles([]);
+    setMatterId_internal("");
   }
 
   function handleFilesSelected() {
@@ -210,16 +223,16 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
     setStep("source");
   }
 
-  async function handleSourceSelected(src: "human" | "ai") {
-    setSource(src);
+  async function handleSourceSelected(_unused: "human" | "ai") {
     setStep("processing");
     setLoading(true);
     setError(null);
 
     const authHeaders = await getAuthHeaders();
     const mId = matterId ?? `matter-${Date.now()}`;
+    setMatterId_internal(mId);
 
-    // Auto-create case if none provided (creates both Supabase case + Neo4j matter)
+    // Auto-create case if none provided
     if (!matterId) {
       try {
         await fetch(`${BACKEND}/api/cases`, {
@@ -230,20 +243,19 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
       } catch { /* case may already exist */ }
     }
 
-    const allResults: FileResult[] = [];
+    // Phase 1: Upload all files and collect similarity info
+    const pending: PendingFile[] = [];
+    const autoResults: FileResult[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       setCurrentIndex(i);
 
       try {
-        // 1. Upload
         const form = new FormData();
         form.append("file", file);
         form.append("matter_id", mId);
-        if (simulatedDate) {
-          form.append("simulated_date", simulatedDate);
-        }
+        if (simulatedDate) form.append("simulated_date", simulatedDate);
 
         const uploadRes = await fetch(`${BACKEND}/api/documents/upload`, {
           method: "POST",
@@ -256,79 +268,124 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
         const similarity: SimilarityInfo | null = uploadData.similarity ?? null;
         const semanticMatch: SemanticMatchInfo | null = uploadData.semantic_match ?? null;
 
-        // If exact duplicate, skip confirm + extract
+        // Exact duplicates are auto-skipped
         if (similarity?.status === "exact_duplicate") {
-          allResults.push({
-            filename: file.name,
-            status: "duplicate",
-            similarity,
-          });
-          setResults([...allResults]);
+          autoResults.push({ filename: file.name, status: "duplicate", similarity });
           continue;
         }
 
-        // 2. Confirm
+        // Flagged files need user decision
+        const isFlagged = similarity?.status === "near_duplicate" ||
+          similarity?.status === "similar" ||
+          semanticMatch?.relationship === "evolved_version";
+
+        pending.push({
+          index: i,
+          file,
+          uploadData,
+          similarity,
+          semanticMatch,
+          decision: isFlagged ? "pending" : "upload",
+        });
+      } catch (e) {
+        autoResults.push({
+          filename: file.name,
+          status: "error",
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    setResults(autoResults);
+
+    // If any files need review, pause for user decision
+    const needsReview = pending.filter((p) => p.decision === "pending");
+    if (needsReview.length > 0) {
+      setPendingFiles(pending);
+      setLoading(false);
+      setStep("review-similar");
+      return;
+    }
+
+    // Otherwise, process all immediately
+    setPendingFiles(pending);
+    await processApprovedFiles(pending, autoResults, authHeaders);
+  }
+
+  async function processApprovedFiles(
+    pending: PendingFile[],
+    existingResults: FileResult[],
+    authHeaders: Record<string, string>,
+  ) {
+    setStep("processing");
+    setLoading(true);
+    const allResults = [...existingResults];
+
+    const toProcess = pending.filter((p) => p.decision !== "skip");
+
+    for (let j = 0; j < toProcess.length; j++) {
+      const p = toProcess[j];
+      setCurrentIndex(j);
+
+      try {
+        const fileSource = fileSources[p.index] ?? "human";
         const confirmRes = await fetch(`${BACKEND}/api/documents/confirm`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
-            upload_id: uploadData.upload_id,
-            source: src,
-            author: src === "human" ? "uploaded by user" : null,
-            model: src === "ai" ? "unknown" : null,
+            upload_id: p.uploadData.upload_id,
+            source: fileSource,
+            author: fileSource === "human" ? "uploaded by user" : null,
+            model: fileSource === "ai" ? "unknown" : null,
             doc_type: "",
           }),
         });
         if (!confirmRes.ok) throw new Error(await confirmRes.text());
         const confirmed = await confirmRes.json();
 
-        // 3. Extract
         const extractRes = await fetch(
           `${BACKEND}/api/documents/${encodeURIComponent(confirmed.document_id)}/extract`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json", ...authHeaders },
-            body: JSON.stringify({
-              provider: "anthropic",
-              model_name: "claude-haiku-4-5-20251001",
-            }),
+            body: JSON.stringify({ provider: "anthropic", model_name: "claude-haiku-4-5-20251001" }),
           }
         );
         if (!extractRes.ok) throw new Error(await extractRes.text());
         const extractData = await extractRes.json();
 
-        // Auto-link near-duplicates as versions
-        if (similarity?.status === "near_duplicate" && uploadData.similarity?.matched_document_id) {
+        // Auto-link versions
+        if (p.similarity?.status === "near_duplicate" && p.uploadData.similarity?.matched_document_id) {
           try {
             await fetch(`${BACKEND}/api/documents/link-version`, {
               method: "POST",
               headers: { "Content-Type": "application/json", ...authHeaders },
               body: JSON.stringify({
-                new_document_id: uploadData.case_doc_id || confirmed.document_id,
-                parent_document_id: uploadData.similarity.matched_document_id,
+                new_document_id: (p.uploadData as Record<string, unknown>).case_doc_id || confirmed.document_id,
+                parent_document_id: (p.uploadData.similarity as SimilarityInfo).matched_document_id,
               }),
             });
-          } catch { /* version linking failed, not critical */ }
+          } catch { /* not critical */ }
         }
 
-        const docStatus = semanticMatch?.relationship === "evolved_version"
+        const docStatus = p.semanticMatch?.relationship === "evolved_version"
           ? "evolved_version" as const
-          : similarity?.status === "near_duplicate"
+          : p.similarity?.status === "near_duplicate"
             ? "near_duplicate" as const
             : "success" as const;
 
         allResults.push({
-          filename: file.name,
+          filename: p.file.name,
           status: docStatus,
           entities_extracted: extractData.entities_extracted,
           relations_extracted: extractData.relations_extracted,
-          similarity,
-          semantic_match: semanticMatch,
+          similarity: p.similarity,
+          semantic_match: p.semanticMatch,
           document_id: confirmed.document_id,
         });
       } catch (e) {
         allResults.push({
-          filename: file.name,
+          filename: p.file.name,
           status: "error",
           error: e instanceof Error ? e.message : String(e),
         });
@@ -337,6 +394,16 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
       setResults([...allResults]);
     }
 
+    // Add skipped files to results
+    for (const p of pending.filter((p) => p.decision === "skip")) {
+      allResults.push({
+        filename: p.file.name,
+        status: "duplicate",
+        similarity: p.similarity,
+      });
+    }
+
+    setResults(allResults);
     setLoading(false);
     setStep("done");
   }
@@ -413,48 +480,162 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
           </>
         )}
 
-        {/* Step 2: Source — human or AI? */}
+        {/* Step 2: Source — per-file human or AI toggle */}
         {step === "source" && (
           <>
             <DialogHeader>
-              <DialogTitle>Are these documents human or AI generated?</DialogTitle>
+              <DialogTitle>Mark each file as human or AI generated</DialogTitle>
               <DialogDescription>
-                {files.length} file{files.length > 1 ? "s" : ""} selected
+                {files.length} file{files.length > 1 ? "s" : ""} selected — click to toggle
               </DialogDescription>
             </DialogHeader>
 
-            <div className="max-h-32 overflow-y-auto py-2">
-              <div className="space-y-1">
-                {files.map((f, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <FileText className="size-3.5 shrink-0" />
-                    <span className="truncate">{f.name}</span>
-                    <span className="ml-auto shrink-0 tabular-nums">{(f.size / 1024).toFixed(0)}KB</span>
-                  </div>
-                ))}
+            <div className="max-h-52 overflow-y-auto py-2">
+              <div className="space-y-1.5">
+                {files.map((f, i) => {
+                  const src = fileSources[i] ?? "human";
+                  const isAI = src === "ai";
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-xs rounded-md border p-2">
+                      <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate flex-1">{f.name}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{(f.size / 1024).toFixed(0)}KB</span>
+                      <button
+                        onClick={() => setFileSources((prev) => ({ ...prev, [i]: isAI ? "human" : "ai" }))}
+                        className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-all ${
+                          isAI
+                            ? "bg-blue-500/15 text-blue-600 ring-1 ring-blue-500/30"
+                            : "bg-foreground/8 text-foreground/60"
+                        }`}
+                      >
+                        {isAI ? <Bot className="size-3" /> : <User className="size-3" />}
+                        {isAI ? "AI" : "Human"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 py-4">
+            <div className="flex gap-2 pt-3">
+              <button
+                onClick={() => {
+                  const allHuman: Record<number, "human" | "ai"> = {};
+                  files.forEach((_, i) => { allHuman[i] = "human"; });
+                  setFileSources(allHuman);
+                }}
+                className="flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                All human
+              </button>
+              <button
+                onClick={() => {
+                  const allAI: Record<number, "human" | "ai"> = {};
+                  files.forEach((_, i) => { allAI[i] = "ai"; });
+                  setFileSources(allAI);
+                }}
+                className="flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted"
+              >
+                All AI
+              </button>
               <button
                 onClick={() => handleSourceSelected("human")}
                 disabled={loading}
-                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 transition-all hover:border-foreground/40 hover:bg-muted/40 active:scale-[0.98]"
+                className="flex-1 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-opacity hover:opacity-90"
               >
-                <User className="size-8 text-muted-foreground" />
-                <span className="text-sm font-medium">Human-authored</span>
-              </button>
-              <button
-                onClick={() => handleSourceSelected("ai")}
-                disabled={loading}
-                className="flex flex-col items-center gap-3 rounded-lg border-2 border-muted-foreground/20 p-6 transition-all hover:border-foreground/40 hover:bg-muted/40 active:scale-[0.98]"
-              >
-                <Bot className="size-8 text-muted-foreground" />
-                <span className="text-sm font-medium">AI-generated</span>
+                Continue
               </button>
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+          </>
+        )}
+
+        {/* Step 2.5: Review similar documents */}
+        {step === "review-similar" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Similar documents detected</DialogTitle>
+              <DialogDescription>
+                Some files appear to match existing documents. Choose what to do with each.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="max-h-64 overflow-y-auto py-2 space-y-2">
+              {pendingFiles.filter((p) => p.decision === "pending" || p.decision === "skip").map((p) => {
+                const isFlagged = p.decision === "pending" || p.decision === "skip";
+                const matchName = p.semanticMatch?.matched_filename || p.similarity?.matched_filename || "existing document";
+                const isEvolved = p.semanticMatch?.relationship === "evolved_version";
+                const score = p.similarity?.score ?? p.semanticMatch?.confidence ?? 0;
+
+                return (
+                  <div key={p.index} className={`rounded-md border p-3 space-y-2 ${p.decision === "skip" ? "opacity-50" : ""}`}>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className={`mt-0.5 size-4 shrink-0 ${isEvolved ? "text-blue-500" : "text-amber-500"}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{p.file.name}</div>
+                        <div className={`text-xs ${isEvolved ? "text-blue-600" : "text-amber-600"}`}>
+                          {isEvolved
+                            ? `Evolved version of "${matchName}"`
+                            : `~${Math.round(score * 100)}% similar to "${matchName}"`}
+                        </div>
+                        {p.semanticMatch?.explanation && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">{p.semanticMatch.explanation}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pl-6">
+                      <button
+                        onClick={() => setPendingFiles((prev) =>
+                          prev.map((f) => f.index === p.index ? { ...f, decision: "upload" } : f)
+                        )}
+                        className={`flex-1 rounded px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                          p.decision === "upload"
+                            ? "bg-foreground text-background"
+                            : "border hover:bg-muted"
+                        }`}
+                      >
+                        Upload anyway
+                      </button>
+                      <button
+                        onClick={() => setPendingFiles((prev) =>
+                          prev.map((f) => f.index === p.index ? { ...f, decision: "skip" } : f)
+                        )}
+                        className={`flex-1 rounded px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                          p.decision === "skip"
+                            ? "bg-foreground text-background"
+                            : "border hover:bg-muted"
+                        }`}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Non-flagged files (auto-approved) */}
+              {pendingFiles.filter((p) => p.decision === "upload" && !(p.similarity?.status === "near_duplicate" || p.similarity?.status === "similar" || p.semanticMatch?.relationship === "evolved_version")).map((p) => (
+                <div key={p.index} className="flex items-center gap-2 rounded-md border p-2 text-xs text-muted-foreground">
+                  <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />
+                  <span className="truncate">{p.file.name}</span>
+                  <span className="ml-auto text-emerald-600">New — will upload</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2 pt-3">
+              <button
+                onClick={async () => {
+                  const authHeaders = await getAuthHeaders();
+                  await processApprovedFiles(pendingFiles, results, authHeaders);
+                }}
+                className="flex-1 rounded-md bg-foreground px-3 py-2 text-xs font-medium text-background transition-opacity hover:opacity-90"
+              >
+                Continue with selected
+              </button>
+            </div>
           </>
         )}
 

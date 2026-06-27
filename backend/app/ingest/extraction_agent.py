@@ -238,6 +238,10 @@ Rules:
 - For dates: use ISO format (YYYY-MM-DD) when the exact date is known.
 - Create relations between entities AFTER adding them. Map the full web of relationships.
 - Invent entity types and relation types as needed — the graph is flexible.
+- NEVER ask questions or request clarification. Extract whatever you can from the text provided,
+  even if it's short, informal, or doesn't look like a traditional legal document. Emails,
+  internal memos, performance reviews, and notes are all valuable evidence in a case.
+- ALWAYS call your tools. Even a 2-line email has parties, dates, and facts worth extracting.
 """
 
 

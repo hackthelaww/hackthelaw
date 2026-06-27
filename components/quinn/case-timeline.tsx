@@ -3,18 +3,12 @@
 import { useState, useEffect } from "react";
 import {
   FileText, CheckCircle2, AlertTriangle, Copy, Clock,
-  ChevronDown, ChevronRight, ArrowUpRight, Loader2,
+  ChevronDown, ChevronRight, ArrowUpRight, Loader2, Bot,
 } from "lucide-react";
-import { getTimeline, getDocumentContent, type TimelineBatch, type TimelineData } from "@/lib/backend";
+import { getTimeline, type TimelineBatch, type TimelineData } from "@/lib/backend";
 import { DocumentDiffDialog } from "@/components/quinn/document-diff-dialog";
 import { DocumentLifecycle } from "@/components/quinn/document-lifecycle";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { DocumentViewer } from "@/components/quinn/document-viewer";
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
@@ -66,60 +60,15 @@ function StatusBadge({ status, score, parentFilename }: {
   );
 }
 
-function DocumentPreviewDialog({
-  doc,
-  onClose,
-}: {
-  doc: TimelineBatch["documents"][0];
-  onClose: () => void;
-}) {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getDocumentContent(doc.id)
-      .then((data) => setContent(data.content))
-      .catch(() => setContent("Could not load document content."))
-      .finally(() => setLoading(false));
-  }, [doc.id]);
-
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="size-4" />
-            {doc.filename}
-          </DialogTitle>
-          <DialogDescription>
-            {doc.char_count.toLocaleString()} characters · {doc.entity_count} entities extracted
-            {doc.uploaded_by_email && ` · uploaded by ${doc.uploaded_by_email.split("@")[0]}`}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex-1 overflow-y-auto rounded-md border bg-muted/20 p-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground/80">
-              {content}
-            </pre>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function DocumentCard({ doc, matterId, onViewDiff }: {
   doc: TimelineBatch["documents"][0];
   matterId: string;
   onViewDiff: (docId: string) => void;
 }) {
   const [showLifecycle, setShowLifecycle] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
   const isDupe = doc.similarity_status === "exact_duplicate";
+  const hasAnnotations = doc.similarity_status === "evolved_version" || doc.similarity_status === "near_duplicate";
   const hasVersions = doc.version_chain.length > 0 || doc.similarity_status === "evolved_version" || doc.similarity_status === "near_duplicate";
 
   const uploaderInitial = doc.uploaded_by_email
@@ -132,14 +81,20 @@ function DocumentCard({ doc, matterId, onViewDiff }: {
   return (
     <div className={`group rounded-md border transition-all hover:border-foreground/20 ${isDupe ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-3 p-3">
-        {/* Uploader avatar */}
-        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-bold text-foreground/70" title={doc.uploaded_by_email}>
-          {uploaderInitial}
-        </div>
+        {/* Uploader avatar — AI-generated docs get a distinct indicator */}
+        {doc.source === "ai" ? (
+          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-blue-500 ring-1 ring-blue-500/30" title="AI-generated document">
+            <Bot className="size-3.5" />
+          </div>
+        ) : (
+          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-bold text-foreground/70" title={doc.uploaded_by_email}>
+            {uploaderInitial}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowPreview(true)}
+              onClick={() => setShowViewer(true)}
               className="truncate text-sm font-medium text-foreground hover:underline underline-offset-2 text-left"
             >
               {doc.filename}
@@ -196,9 +151,14 @@ function DocumentCard({ doc, matterId, onViewDiff }: {
         </div>
       )}
 
-      {/* Document preview dialog */}
-      {showPreview && (
-        <DocumentPreviewDialog doc={doc} onClose={() => setShowPreview(false)} />
+      {/* Document viewer (with annotations if available) */}
+      {showViewer && (
+        <DocumentViewer
+          documentId={doc.id}
+          filename={doc.filename}
+          parentFilename={doc.similarity_parent_filename}
+          onClose={() => setShowViewer(false)}
+        />
       )}
     </div>
   );
@@ -319,9 +279,9 @@ export function CaseTimeline({ matterId }: { matterId: string }) {
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Timeline (most recent first) */}
       <div className="relative">
-        {data.batches.map((batch) => (
+        {[...data.batches].reverse().map((batch) => (
           <BatchNode
             key={batch.batch_date}
             batch={batch}
@@ -330,16 +290,14 @@ export function CaseTimeline({ matterId }: { matterId: string }) {
           />
         ))}
 
-        {/* End dot */}
+        {/* End dot — oldest */}
         <div className="flex items-center gap-4">
           <div className="flex flex-col items-center">
             <div className="flex size-3 items-center justify-center rounded-full bg-foreground/20" />
           </div>
           <span className="text-xs text-muted-foreground">
             <Clock className="mr-1 inline size-3" />
-            {data.date_range.first === data.date_range.last
-              ? `Started ${formatDate(data.date_range.first!)}`
-              : `${formatDate(data.date_range.first!)} — ${formatDate(data.date_range.last!)}`}
+            Case started {data.date_range.first ? formatDate(data.date_range.first) : ""}
           </span>
         </div>
       </div>

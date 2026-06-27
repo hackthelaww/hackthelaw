@@ -111,6 +111,7 @@ async def get_timeline(slug: str, user: AuthUser = Depends(get_current_user)) ->
             "version_number": doc.get("version_number", 1),
             "version_chain": version_chains.get(doc["id"], []),
             "entity_count": entity_map.get(neo4j_doc_id, 0),
+            "source": doc.get("source", "upload"),
             "extraction_status": doc.get("extraction_status", "pending"),
             "char_count": doc.get("char_count", 0),
         })

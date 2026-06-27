@@ -42,9 +42,11 @@ Respond with ONLY valid JSON:
 }}
 
 Definitions:
-- evolved_version: Same document purpose (e.g., both are formal complaints about the same matter), but version B is rewritten, expanded, or improved. Same parties, same core subject.
-- same_topic: Related to the same legal matter but different document types (e.g., a complaint vs a witness statement about the same case).
+- evolved_version: STRICTLY means the SAME document rewritten or improved. Both documents must be the SAME TYPE (e.g., both are complaint letters, both are contracts, both are witness statements). They must serve the same purpose and function. Simply sharing the same parties or the same legal matter is NOT enough.
+- same_topic: Documents about the same legal matter or case but DIFFERENT types. For example: an email from a client AND a formal complaint letter about the same case are "same_topic", NOT "evolved_version". A performance review AND a dismissal letter are "same_topic". An informal note AND a formal pleading are "same_topic".
 - unrelated: Different legal matters or no meaningful connection.
+
+CRITICAL: An email is NEVER an evolved_version of a formal complaint (or vice versa). A performance review is NEVER an evolved_version of a pleading. Different document types = same_topic at most, NEVER evolved_version.
 
 Return ONLY the JSON object."""
 

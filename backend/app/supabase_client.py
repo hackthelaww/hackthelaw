@@ -38,6 +38,17 @@ def get_case_uuid_by_slug(slug: str) -> str | None:
     return None
 
 
+def safe_maybe_single(query):
+    """Execute a maybe_single() query safely — returns None instead of crashing."""
+    try:
+        result = query.maybe_single().execute()
+        if result and result.data:
+            return result.data
+    except Exception:
+        pass
+    return None
+
+
 def ping_supabase() -> dict:
     """Verify connectivity to Supabase."""
     try:
