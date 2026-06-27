@@ -177,12 +177,20 @@ async def upload_document(
                 matches = find_similar_by_embedding(new_embedding, existing_embs, threshold=0.75)
                 if matches:
                     best = matches[0]
-                    # Only flag as near_duplicate at ≥0.99 (nearly identical)
-                    # Everything else is treated as a new document
                     from app.ingest.similarity import SimilarityResult
                     if best["similarity"] >= 0.99:
+                        # Near-identical — flag for user confirmation
                         similarity = SimilarityResult(
                             status="near_duplicate",
+                            score=best["similarity"],
+                            matched_document_id=best["id"],
+                            matched_filename=best["filename"],
+                            diff_summary=None,
+                        )
+                    elif best["similarity"] >= 0.85:
+                        # High similarity — auto-link as evolved version (no user prompt)
+                        similarity = SimilarityResult(
+                            status="evolved_version",
                             score=best["similarity"],
                             matched_document_id=best["id"],
                             matched_filename=best["filename"],
@@ -519,6 +527,51 @@ async def extract_document(document_id: str, body: ExtractRequest, user: AuthUse
                 "relations": len(result["relations"]),
             },
         )
+
+        # Run case intelligence agent (classify changes, detect inconsistencies)
+        try:
+            from app.ingest.case_intelligence import run_case_intelligence, store_case_events
+            doc_title = row.get("title") or document_id
+            events = await run_case_intelligence(
+                matter_id=matter_id,
+                new_document_title=doc_title,
+                new_document_id=document_id,
+            )
+            if events:
+                # Get the document's date from case_documents (uses simulated date if set)
+                event_date = None
+                try:
+                    doc_rows = (
+                        get_supabase()
+                        .table("case_documents")
+                        .select("created_at")
+                        .eq("neo4j_document_id", document_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if doc_rows and doc_rows.data:
+                        event_date = doc_rows.data[0]["created_at"][:10]
+                except Exception:
+                    pass
+                # Fallback: try by case_id + filename match
+                if not event_date and case_uuid:
+                    try:
+                        doc_rows = (
+                            get_supabase()
+                            .table("case_documents")
+                            .select("created_at")
+                            .eq("case_id", case_uuid)
+                            .order("created_at", desc=True)
+                            .limit(1)
+                            .execute()
+                        )
+                        if doc_rows and doc_rows.data:
+                            event_date = doc_rows.data[0]["created_at"][:10]
+                    except Exception:
+                        pass
+                await store_case_events(matter_id, events, event_date=event_date)
+        except Exception:
+            pass  # Intelligence analysis should never block extraction
 
         return {
             "document_id": document_id,
@@ -876,19 +929,28 @@ async def get_document_content(document_id: str) -> dict:
     """
     sb = get_supabase()
 
-    # Look up the Neo4j document ID from Supabase
-    sb_doc = (
-        sb.table("case_documents")
-        .select("neo4j_document_id, filename, title")
-        .eq("id", document_id)
-        .maybe_single()
-        .execute()
-    )
+    # Look up by UUID first, then Neo4j ID, then filename
     neo4j_doc_id = None
     filename = ""
-    if sb_doc and sb_doc.data:
-        neo4j_doc_id = sb_doc.data.get("neo4j_document_id")
-        filename = sb_doc.data.get("filename", "")
+
+    # Try as Supabase UUID
+    try:
+        sb_doc = sb.table("case_documents").select("neo4j_document_id, filename, title").eq("id", document_id).maybe_single().execute()
+        if sb_doc and sb_doc.data:
+            neo4j_doc_id = sb_doc.data.get("neo4j_document_id")
+            filename = sb_doc.data.get("filename", "")
+    except Exception:
+        pass
+
+    # Try as filename (for when source_documents stores filenames)
+    if not neo4j_doc_id:
+        try:
+            sb_doc = sb.table("case_documents").select("neo4j_document_id, filename, title").eq("filename", document_id).limit(1).execute()
+            if sb_doc and sb_doc.data:
+                neo4j_doc_id = sb_doc.data[0].get("neo4j_document_id")
+                filename = sb_doc.data[0].get("filename", "")
+        except Exception:
+            pass
 
     # If no Supabase match, try as Neo4j doc ID directly
     if not neo4j_doc_id:

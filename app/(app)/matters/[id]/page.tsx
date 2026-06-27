@@ -138,11 +138,44 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               )}
             </div>
 
-            {/* AI summary key facts */}
-            {summary?.key_facts && summary.key_facts.length > 0 && (
-              <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                {summary.key_facts[0]}
-              </p>
+            {/* AI case description */}
+            {summary && (
+              <div className="max-w-2xl space-y-1.5">
+                {/* Key facts — show up to 3 */}
+                {summary.key_facts && summary.key_facts.length > 0 && (
+                  <div className="space-y-1">
+                    {summary.key_facts.slice(0, 3).map((fact: string, i: number) => (
+                      <p key={i} className="text-sm text-muted-foreground leading-relaxed">
+                        {fact}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Risks summary */}
+                {summary.risks && summary.risks.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {summary.risks.slice(0, 3).map((risk: { description: string; severity: string }, i: number) => (
+                      <span key={i} className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                        risk.severity === "critical" || risk.severity === "high"
+                          ? "bg-red-500/10 text-red-600"
+                          : "bg-amber-500/10 text-amber-600"
+                      }`}>
+                        {risk.description.length > 60 ? risk.description.slice(0, 60) + "..." : risk.description}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Timeline highlights */}
+                {summary.timeline && summary.timeline.length > 0 && (
+                  <p className="text-xs text-muted-foreground/70 pt-0.5">
+                    Timeline: {summary.timeline.slice(0, 3).map((t: { date: string; event: string }) =>
+                      `${t.date} — ${t.event}`
+                    ).join(" · ")}
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

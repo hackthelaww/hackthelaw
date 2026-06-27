@@ -192,6 +192,47 @@ export async function getTimeline(slug: string): Promise<TimelineData> {
   return request<TimelineData>(`/api/cases/${encodeURIComponent(slug)}/timeline`);
 }
 
+// ---------------------------------------------------------------------------
+// Case Events (intelligence timeline)
+// ---------------------------------------------------------------------------
+
+export interface CaseEvent {
+  id: string;
+  case_id: string;
+  category: "positive" | "routine" | "anomaly";
+  title: string;
+  description: string;
+  severity: "low" | "medium" | "high";
+  entities_involved: string[];
+  source_documents: string[];
+  resolution: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export interface CaseHealth {
+  positive: number;
+  routine: number;
+  anomalies: number;
+  unresolved_anomalies: number;
+  total: number;
+}
+
+export async function getCaseEvents(slug: string, category?: string) {
+  const path = category
+    ? `/api/cases/${encodeURIComponent(slug)}/events?category=${category}`
+    : `/api/cases/${encodeURIComponent(slug)}/events`;
+  return request<{ events: CaseEvent[]; health: CaseHealth }>(path);
+}
+
+export async function resolveEvent(slug: string, eventId: string, resolution: string) {
+  return request(`/api/cases/${encodeURIComponent(slug)}/events/${encodeURIComponent(eventId)}/resolve`, {
+    method: "PUT",
+    body: JSON.stringify({ resolution }),
+  });
+}
+
 export async function getDocumentContent(docId: string) {
   return request<{ content: string; title: string; filename: string }>(
     `/api/documents/${encodeURIComponent(docId)}/content`
