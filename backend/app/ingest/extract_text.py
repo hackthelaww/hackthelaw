@@ -16,6 +16,8 @@ def extract_text(file_path: str, content_type: str) -> str:
         return _extract_eml(file_path)
     if content_type == "application/vnd.oasis.opendocument.text" or file_path.endswith(".odt"):
         return _extract_odt(file_path)
+    if content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or file_path.endswith(".docx"):
+        return _extract_docx(file_path)
     # Plain text, markdown, etc.
     return Path(file_path).read_text(encoding="utf-8", errors="replace")
 
@@ -67,6 +69,24 @@ def _extract_eml(file_path: str) -> str:
         parts.append(content)
 
     return "\n".join(parts)
+
+
+def _extract_docx(file_path: str) -> str:
+    """Extract text from .docx (Word) files."""
+    import zipfile
+    import xml.etree.ElementTree as ET
+
+    with zipfile.ZipFile(file_path) as z:
+        with z.open("word/document.xml") as f:
+            tree = ET.parse(f)
+
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs = []
+    for p in tree.getroot().iter(f"{{{ns['w']}}}p"):
+        texts = [t.text for t in p.iter(f"{{{ns['w']}}}t") if t.text]
+        if texts:
+            paragraphs.append("".join(texts))
+    return "\n".join(paragraphs)
 
 
 def _extract_odt(file_path: str) -> str:

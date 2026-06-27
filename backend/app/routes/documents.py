@@ -65,8 +65,10 @@ async def upload_document(
         ct = "message/rfc822"
     elif fn.endswith(".odt"):
         ct = "application/vnd.oasis.opendocument.text"
+    elif fn.endswith(".docx"):
+        ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-    supported = ("application/pdf", "text/plain", "text/markdown", "image/png", "image/jpeg", "image/jpg", "message/rfc822", "application/vnd.oasis.opendocument.text")
+    supported = ("application/pdf", "text/plain", "text/markdown", "image/png", "image/jpeg", "image/jpg", "message/rfc822", "application/vnd.oasis.opendocument.text", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     if ct not in supported:
         raise HTTPException(400, f"Unsupported file type: {ct}. Supported: PDF, TXT, MD, PNG, JPG, EML, ODT")
 
@@ -100,11 +102,30 @@ async def upload_document(
     c_hash = content_hash(text)
     case_doc_id = str(uuid.uuid4())
 
-    # Check for duplicate
+    # Check for duplicate within this matter only
     existing = await read_query(
-        "MATCH (v:Version {content_hash: $hash}) RETURN v.id AS id, v.document_id AS doc_id LIMIT 1",
-        {"hash": c_hash},
+        """
+        MATCH (d:Document)-[:BELONGS_TO]->(:Matter {id: $mid})
+        MATCH (d)-[:HAS_VERSION]->(v:Version {content_hash: $hash})
+        RETURN v.id AS id, d.id AS doc_id LIMIT 1
+        """,
+        {"mid": matter_id, "hash": c_hash},
     )
+
+    # Run similarity detection BEFORE inserting (so it doesn't find its own row)
+    similarity = None
+    if case_uuid:
+        try:
+            similarity = await find_similar_documents(
+                new_text=text,
+                new_hash=c_hash,
+                matter_slug=matter_id,
+                case_uuid=case_uuid,
+                supabase_client=get_supabase(),
+                neo4j_read_query=read_query,
+            )
+        except Exception:
+            pass
 
     # Upload file to Supabase Storage
     storage_path = None
@@ -115,31 +136,27 @@ async def upload_document(
                 storage_path, file_bytes, {"content-type": ct}
             )
         except Exception:
-            storage_path = None  # Storage upload failed, continue without it
+            storage_path = None
 
-    # Insert pending row into Supabase case_documents
-    sb_doc_data = None
+    # Insert pending row into Supabase case_documents (with similarity info)
     if case_uuid:
         try:
-            sb_result = (
-                get_supabase()
-                .table("case_documents")
-                .insert({
-                    "id": case_doc_id,
-                    "case_id": case_uuid,
-                    "filename": file.filename,
-                    "title": title or file.filename,
-                    "content_hash": c_hash,
-                    "char_count": len(text),
-                    "storage_path": storage_path,
-                    "extraction_status": "pending",
-                    "uploaded_by": user.id,
-                })
-                .execute()
-            )
-            sb_doc_data = sb_result.data[0] if sb_result.data else None
+            get_supabase().table("case_documents").insert({
+                "id": case_doc_id,
+                "case_id": case_uuid,
+                "filename": file.filename,
+                "title": title or file.filename,
+                "content_hash": c_hash,
+                "char_count": len(text),
+                "storage_path": storage_path,
+                "extraction_status": "pending",
+                "uploaded_by": user.id,
+                "similarity_status": similarity.status if similarity else "new",
+                "similarity_score": similarity.score if similarity else None,
+                "similarity_parent_id": similarity.matched_document_id if similarity else None,
+            }).execute()
         except Exception:
-            pass  # Supabase insert failed, continue with Neo4j-only flow
+            pass
 
     _pending_uploads[upload_id] = {
         "upload_id": upload_id,
@@ -155,27 +172,6 @@ async def upload_document(
         "case_doc_id": case_doc_id,
         "storage_path": storage_path,
     }
-
-    # Run similarity detection against existing docs in the case
-    similarity = None
-    if case_uuid:
-        try:
-            similarity = await find_similar_documents(
-                new_text=text,
-                new_hash=c_hash,
-                matter_slug=matter_id,
-                case_uuid=case_uuid,
-                supabase_client=get_supabase(),
-                neo4j_read_query=read_query,
-            )
-            # Update Supabase row with similarity info
-            get_supabase().table("case_documents").update({
-                "similarity_status": similarity.status,
-                "similarity_score": similarity.score,
-                "similarity_parent_id": similarity.matched_document_id,
-            }).eq("id", case_doc_id).execute()
-        except Exception:
-            pass  # Similarity detection failed, continue
 
     log_action(
         "document_uploaded",

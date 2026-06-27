@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, Loader2, CheckCircle2, Sparkles, User, Bot, AlertTriangle, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,12 +39,135 @@ interface FileResult {
 async function getAuthHeaders(): Promise<Record<string, string>> {
   try {
     const supabase = createClient();
+    // getUser() is more reliable than getSession() for getting the current token
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.access_token) {
       return { Authorization: `Bearer ${session.access_token}` };
     }
+    // Fallback: try refreshing
+    const { data } = await supabase.auth.refreshSession();
+    if (data.session?.access_token) {
+      return { Authorization: `Bearer ${data.session.access_token}` };
+    }
   } catch { /* no auth */ }
   return {};
+}
+
+const PROCESSING_MESSAGES = [
+  "Reading document contents...",
+  "Extracting text and metadata...",
+  "Scanning for similar documents...",
+  "Building knowledge graph...",
+  "Identifying parties and entities...",
+  "Mapping relationships...",
+  "Analyzing obligations and deadlines...",
+  "Cross-referencing with existing data...",
+  "Detecting key clauses...",
+  "Almost there...",
+];
+
+function ProcessingView({
+  files, currentIndex, loading, results, error, onClose,
+}: {
+  files: File[];
+  currentIndex: number;
+  loading: boolean;
+  results: FileResult[];
+  error: string | null;
+  onClose: () => void;
+}) {
+  const [msgIndex, setMsgIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMsgIndex((prev) => (prev + 1) % PROCESSING_MESSAGES.length);
+    }, 2800);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Reset message index when file changes
+  useEffect(() => {
+    setMsgIndex(0);
+  }, [currentIndex]);
+
+  const elapsed = results.length;
+  const total = files.length;
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Analyzing documents...</DialogTitle>
+        <DialogDescription>
+          File {Math.min(currentIndex + 1, total)} of {total}
+          {elapsed > 0 && ` · ${elapsed} done`}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="py-4 space-y-4">
+        {/* Progress bar */}
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-foreground/60 transition-all duration-700 ease-out"
+            style={{ width: `${((currentIndex + (loading ? 0.5 : 1)) / total) * 100}%` }}
+          />
+        </div>
+
+        {/* Animated status */}
+        <div className="flex flex-col items-center justify-center gap-3 py-6">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute size-10 animate-ping rounded-full bg-amber-500/10" />
+            <Sparkles className="relative size-6 animate-pulse text-amber-500" />
+          </div>
+          <span className="text-sm font-medium truncate max-w-[280px]">
+            {files[currentIndex]?.name ?? "..."}
+          </span>
+          <span
+            key={msgIndex}
+            className="text-xs text-muted-foreground animate-fade-in"
+          >
+            {PROCESSING_MESSAGES[msgIndex]}
+          </span>
+        </div>
+
+        {/* Completed results so far */}
+        {results.length > 0 && (
+          <div className="max-h-36 overflow-y-auto space-y-1.5">
+            {results.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                {r.status === "success" && <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />}
+                {r.status === "near_duplicate" && <AlertTriangle className="size-3.5 text-amber-500 shrink-0" />}
+                {r.status === "duplicate" && <AlertTriangle className="size-3.5 text-red-400 shrink-0" />}
+                {r.status === "error" && <AlertTriangle className="size-3.5 text-destructive shrink-0" />}
+                <span className="truncate">{r.filename}</span>
+                {r.status === "success" && (
+                  <span className="ml-auto shrink-0 text-muted-foreground">
+                    {r.entities_extracted} entities
+                  </span>
+                )}
+                {r.status === "near_duplicate" && (
+                  <span className="ml-auto shrink-0 text-amber-500">
+                    ~{Math.round((r.similarity?.score ?? 0) * 100)}% match
+                  </span>
+                )}
+                {r.status === "duplicate" && (
+                  <span className="ml-auto shrink-0 text-red-400">duplicate</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="space-y-2">
+          <p className="text-sm text-destructive">{error}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </div>
+      )}
+    </>
+  );
 }
 
 export function UploadDocumentButton({ matterId }: { matterId?: string }) {
@@ -85,15 +208,15 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
     const authHeaders = await getAuthHeaders();
     const mId = matterId ?? `matter-${Date.now()}`;
 
-    // Auto-create matter if none provided
+    // Auto-create case if none provided (creates both Supabase case + Neo4j matter)
     if (!matterId) {
       try {
-        await fetch(`${BACKEND}/api/matters`, {
+        await fetch(`${BACKEND}/api/cases`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({ id: mId, name: `Case ${new Date().toLocaleDateString()}`, description: "" }),
         });
-      } catch { /* matter may already exist */ }
+      } catch { /* case may already exist */ }
     }
 
     const allResults: FileResult[] = [];
@@ -215,11 +338,11 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
               >
                 <Upload className="size-8 text-muted-foreground/60" />
                 <span className="text-sm font-medium">Click to select files</span>
-                <span className="text-xs text-muted-foreground">PDF, TXT, MD, PNG, JPG, EML, ODT</span>
+                <span className="text-xs text-muted-foreground">PDF, TXT, MD, PNG, JPG, EML, ODT, DOCX</span>
                 <input
                   id="doc-files"
                   type="file"
-                  accept=".pdf,.txt,.md,.text,.png,.jpg,.jpeg,.eml,.odt"
+                  accept=".pdf,.txt,.md,.text,.png,.jpg,.jpeg,.eml,.odt,.docx"
                   multiple
                   className="hidden"
                   ref={fileRef}
@@ -279,70 +402,16 @@ export function UploadDocumentButton({ matterId }: { matterId?: string }) {
 
         {/* Step 3: Processing */}
         {step === "processing" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Analyzing documents...</DialogTitle>
-              <DialogDescription>
-                Processing file {currentIndex + 1} of {files.length}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="py-4 space-y-3">
-              {/* Progress bar */}
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-foreground/60 transition-all duration-500"
-                  style={{ width: `${((currentIndex + (loading ? 0.5 : 1)) / files.length) * 100}%` }}
-                />
-              </div>
-
-              {/* Current file */}
-              <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground">
-                <Sparkles className="size-5 animate-pulse text-amber-500" />
-                <span className="text-sm">{files[currentIndex]?.name ?? "..."}</span>
-              </div>
-
-              {/* Completed results so far */}
-              {results.length > 0 && (
-                <div className="max-h-36 overflow-y-auto space-y-1.5">
-                  {results.map((r, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs">
-                      {r.status === "success" && <CheckCircle2 className="size-3.5 text-emerald-500 shrink-0" />}
-                      {r.status === "near_duplicate" && <AlertTriangle className="size-3.5 text-amber-500 shrink-0" />}
-                      {r.status === "duplicate" && <AlertTriangle className="size-3.5 text-red-400 shrink-0" />}
-                      {r.status === "error" && <AlertTriangle className="size-3.5 text-destructive shrink-0" />}
-                      <span className="truncate">{r.filename}</span>
-                      {r.status === "success" && (
-                        <span className="ml-auto shrink-0 text-muted-foreground">
-                          {r.entities_extracted} entities
-                        </span>
-                      )}
-                      {r.status === "near_duplicate" && (
-                        <span className="ml-auto shrink-0 text-amber-500">
-                          ~{Math.round((r.similarity?.score ?? 0) * 100)}% match with {r.similarity?.matched_filename}
-                        </span>
-                      )}
-                      {r.status === "duplicate" && (
-                        <span className="ml-auto shrink-0 text-red-400">
-                          duplicate of {r.similarity?.matched_filename}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <div className="space-y-2">
-                <p className="text-sm text-destructive">{error}</p>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setOpen(false); reset(); }}>Close</Button>
-                </DialogFooter>
-              </div>
-            )}
-          </>
+          <ProcessingView
+            files={files}
+            currentIndex={currentIndex}
+            loading={loading}
+            results={results}
+            error={error}
+            onClose={() => { setOpen(false); reset(); }}
+          />
         )}
+
 
         {/* Step 4: Done */}
         {step === "done" && (
