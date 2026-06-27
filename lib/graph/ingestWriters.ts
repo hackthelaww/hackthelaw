@@ -32,7 +32,7 @@ export async function writeEpisode(input: EpisodeInput): Promise<string> {
   return id;
 }
 
-async function mentions(episodeId: string, nodeLabel: string, nodeId: string): Promise<void> {
+export async function mentions(episodeId: string, nodeLabel: string, nodeId: string): Promise<void> {
   await runWrite(
     `MATCH (e:Episode {id: $episodeId})
      MATCH (n:${nodeLabel} {id: $nodeId})
