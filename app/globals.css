@@ -134,3 +134,103 @@
     @apply font-sans;
   }
 }
+
+/* ── Quinn design system additions ── */
+
+/* Subtle noise texture for depth */
+.quinn-surface {
+  position: relative;
+}
+.quinn-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 128px 128px;
+  pointer-events: none;
+  z-index: 0;
+}
+.dark .quinn-surface::before {
+  opacity: 0.04;
+}
+
+/* Distribution bar segments */
+.lane-bar-segment {
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 2px;
+}
+
+/* Entity monogram */
+.monogram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+/* Stagger animation for card grids */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-stagger > * {
+  animation: fadeSlideUp 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.animate-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.animate-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.animate-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.animate-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.animate-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.animate-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.animate-stagger > *:nth-child(8) { animation-delay: 280ms; }
+.animate-stagger > *:nth-child(9) { animation-delay: 320ms; }
+.animate-stagger > *:nth-child(n+10) { animation-delay: 360ms; }
+
+/* Score meter refined */
+.score-track {
+  height: 3px;
+  border-radius: 2px;
+  background: oklch(0.92 0 0);
+  overflow: hidden;
+}
+.dark .score-track {
+  background: oklch(0.25 0 0);
+}
+.score-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: oklch(0.15 0 0);
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.dark .score-fill {
+  background: oklch(0.85 0 0);
+}
+
+/* Timeline tick marks */
+.timeline-track {
+  position: relative;
+}
+.timeline-track::before,
+.timeline-track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 10px;
+  background: oklch(0.75 0 0);
+  transform: translateY(-50%);
+}
+.timeline-track::before { left: 0; }
+.timeline-track::after { right: 0; }

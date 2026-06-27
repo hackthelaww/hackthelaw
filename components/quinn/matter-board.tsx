@@ -18,6 +18,13 @@ import type { MatterTimeRange } from "@/lib/graph/queries";
 
 const LANE_ORDER: Lane[] = ["needs_judgement", "quick_confirm", "auto_cleared", "unassessed"];
 
+const LANE_FILL: Record<Lane, string> = {
+  needs_judgement: "bg-foreground",
+  quick_confirm: "bg-foreground/50",
+  auto_cleared: "bg-foreground/25",
+  unassessed: "bg-foreground/10",
+};
+
 // NVL's base library touches `document` at import time, which breaks Next's
 // SSR pass for client components — load it in the browser only.
 const MatterGraph = dynamic(() => import("@/components/quinn/matter-graph").then((m) => m.MatterGraph), {
@@ -97,7 +104,7 @@ export function MatterBoard({
   const hasHistory = timeRange.earliest !== null && timeRange.latest !== null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {hasHistory && (
         <TimeScrubber
           matterId={matterId}
@@ -109,9 +116,40 @@ export function MatterBoard({
         />
       )}
 
+      {/* ── Distribution bar ── */}
+      <div className="space-y-2">
+        <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+          {LANE_ORDER.map((lane) => {
+            const count = groups[lane].length;
+            if (count === 0) return null;
+            return (
+              <div
+                key={lane}
+                className={`lane-bar-segment ${LANE_FILL[lane]}`}
+                style={{ width: `${(count / clauses.length) * 100}%` }}
+              />
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
+          {LANE_ORDER.map((lane) => {
+            const count = groups[lane].length;
+            if (count === 0) return null;
+            return (
+              <span key={lane} className="flex items-center gap-1.5">
+                <span className={`inline-block size-1.5 rounded-full ${LANE_FILL[lane]}`} />
+                {LANE_META[lane].label}
+                <span className="tabular-nums">({count})</span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Toolbar ── */}
       <div className="flex items-center justify-between gap-2 border-b pb-3">
         <div className="flex items-center gap-3">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
             {clauses.length} clauses · {clauses.filter((c) => c.latestReviewDecision).length} decided
           </span>
           <Tabs
@@ -152,28 +190,38 @@ export function MatterBoard({
 
       {view === "list" ? (
         <div className="flex flex-col gap-6 lg:flex-row">
-          <div className="lg:w-[420px] lg:flex-shrink-0">
+          {/* ── Swim lanes ── */}
+          <div className="lg:w-[440px] lg:flex-shrink-0">
             {LANE_ORDER.map((lane) => {
               const items = groups[lane];
               if (items.length === 0) return null;
               const meta = LANE_META[lane];
               return (
-                <div
-                  key={lane}
-                  className={lane === "needs_judgement" ? "border-l-2 border-foreground pl-3" : "pl-3"}
-                >
-                  <div className="pt-4 pb-1">
+                <div key={lane} className="mb-1">
+                  {/* Lane header */}
+                  <div
+                    className={`flex items-center gap-2 border-b py-3 ${
+                      lane === "needs_judgement" ? "border-l-2 border-l-foreground pl-3" : "pl-3"
+                    }`}
+                  >
+                    <span className={`inline-block size-2 rounded-full ${LANE_FILL[lane]}`} />
                     <h2
                       className={
                         lane === "needs_judgement"
-                          ? "text-base font-semibold text-foreground"
-                          : "text-base font-medium text-foreground"
+                          ? "text-sm font-semibold text-foreground"
+                          : "text-sm font-medium text-foreground"
                       }
                     >
-                      {meta.label} <span className="font-normal text-sm text-muted-foreground">({items.length})</span>
+                      {meta.label}
                     </h2>
-                    <p className="text-xs text-muted-foreground">{meta.hint}</p>
+                    <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                      {items.length}
+                    </span>
+                    <p className="ml-auto hidden text-[10px] text-muted-foreground lg:block">
+                      {meta.hint}
+                    </p>
                   </div>
+                  {/* Clause rows */}
                   <div>
                     {items.map((c) => (
                       <ClauseRow
@@ -189,12 +237,13 @@ export function MatterBoard({
             })}
           </div>
 
+          {/* ── Detail panel ── */}
           <div className="min-h-[480px] flex-1 lg:sticky lg:top-4 lg:h-[calc(100vh-8rem)] lg:border-l lg:pl-6">
             <ClauseDetailPanel clause={selected} onDecided={handleDecided} readOnly={!isLive} />
           </div>
         </div>
       ) : (
-        <div className="h-[calc(100vh-12rem)] border-t">
+        <div className="h-[calc(100vh-12rem)] overflow-hidden rounded-lg border">
           <MatterGraph matterId={matterId} viewingAt={historical?.viewingAt ?? liveGraphAt} />
         </div>
       )}
@@ -218,22 +267,30 @@ function ClauseRow({
     <button
       type="button"
       onClick={onClick}
-      className={`flex w-full items-center gap-3 border-b py-3 text-left transition-colors hover:bg-muted/40 ${
-        selected ? "bg-muted/60" : ""
+      className={`flex w-full items-center gap-3 border-b py-3 pl-3 text-left transition-all ${
+        selected
+          ? "bg-muted/60 shadow-[inset_2px_0_0_0] shadow-foreground"
+          : "hover:bg-muted/30"
       }`}
     >
       <StatusDot tone={statusMeta?.dot ?? "outline"} />
-      <span className="shrink-0 font-mono text-xs uppercase tracking-wide text-muted-foreground">
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         {clause.ref}
       </span>
       <div className="min-w-0 flex-1">
         <span className={`truncate text-sm text-foreground ${statusMeta?.dot === "urgent" ? "font-semibold" : ""}`}>
           {clause.heading}
         </span>
-        {decisionMeta && <span className="ml-2 text-xs text-muted-foreground">{decisionMeta.label}</span>}
+        {decisionMeta && (
+          <span className="ml-2 rounded bg-muted px-1 py-px text-[10px] font-medium text-muted-foreground">
+            {decisionMeta.label}
+          </span>
+        )}
       </div>
       {clause.confidence !== null && (
-        <span className="shrink-0 text-xs text-muted-foreground">{formatPercent(clause.confidence)}</span>
+        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+          {formatPercent(clause.confidence)}
+        </span>
       )}
     </button>
   );

@@ -4,36 +4,36 @@ import { useEffect, useState, useMemo } from "react";
 import { getEntities, type EntityItem } from "@/lib/backend";
 import { UploadDocumentButton } from "@/components/quinn/upload-document";
 
-const TYPE_ICONS: Record<string, string> = {
-  Person: "👤",
-  Organization: "🏢",
-  LawFirm: "⚖️",
-  Court: "🏛️",
-  Judge: "👨‍⚖️",
-  Document: "📄",
-  Clause: "§",
-  Section: "§",
-  Deadline: "⏰",
-  Date: "📅",
-  TimeConstraint: "⏱️",
-  MonetaryAmount: "💰",
-  PaymentObligation: "💸",
-  Obligation: "📋",
-  Right: "✅",
-  Restriction: "🚫",
-  Jurisdiction: "🌍",
-  GoverningLaw: "📜",
-  RiskFactor: "⚠️",
-  Liability: "⚠️",
-  Definition: "📖",
-  Statute: "📕",
-  Observation: "💡",
-  Institution: "🏛️",
-  LegalConcept: "⚖️",
+const TYPE_COLORS: Record<string, string> = {
+  Person: "bg-foreground/10",
+  Organization: "bg-foreground/15",
+  LawFirm: "bg-foreground/20",
+  Court: "bg-foreground/20",
+  Judge: "bg-foreground/15",
+  Document: "bg-foreground/8",
+  Clause: "bg-foreground/8",
+  Section: "bg-foreground/8",
+  Deadline: "bg-foreground/25",
+  Date: "bg-foreground/10",
+  TimeConstraint: "bg-foreground/25",
+  MonetaryAmount: "bg-foreground/15",
+  PaymentObligation: "bg-foreground/15",
+  Obligation: "bg-foreground/12",
+  Right: "bg-foreground/10",
+  Restriction: "bg-foreground/20",
+  Jurisdiction: "bg-foreground/12",
+  GoverningLaw: "bg-foreground/12",
+  RiskFactor: "bg-foreground/25",
+  Liability: "bg-foreground/25",
+  Definition: "bg-foreground/8",
+  Statute: "bg-foreground/12",
+  Observation: "bg-foreground/10",
+  Institution: "bg-foreground/15",
+  LegalConcept: "bg-foreground/12",
 };
 
-function getIcon(type: string): string {
-  return TYPE_ICONS[type] ?? "📌";
+function getMonogramBg(type: string): string {
+  return TYPE_COLORS[type] ?? "bg-foreground/10";
 }
 
 export function EntityList({ matterId }: { matterId: string }) {
@@ -93,103 +93,158 @@ export function EntityList({ matterId }: { matterId: string }) {
   }
 
   return (
-    <div className="flex gap-6">
-      {/* Left: type filters + entity list */}
-      <div className="w-80 shrink-0 space-y-4">
-        {/* Type filter chips */}
+    <div className="space-y-5">
+      {/* ── Type filter bar ── */}
+      <div className="flex items-center gap-4 border-b pb-4">
+        <span className="shrink-0 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Filter
+        </span>
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setSelectedType(null)}
-            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-              !selectedType ? "border-foreground bg-foreground text-background" : "hover:bg-muted"
+            className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+              !selectedType
+                ? "bg-foreground text-background"
+                : "border hover:bg-muted"
             }`}
           >
-            All ({entities.length})
+            All
+            <span className="ml-1 tabular-nums opacity-60">{entities.length}</span>
           </button>
           {typeGroups.map(([type, items]) => (
             <button
               key={type}
               onClick={() => setSelectedType(selectedType === type ? null : type)}
-              className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                selectedType === type ? "border-foreground bg-foreground text-background" : "hover:bg-muted"
+              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+                selectedType === type
+                  ? "bg-foreground text-background"
+                  : "border hover:bg-muted"
               }`}
             >
-              {getIcon(type)} {type} ({items.length})
-            </button>
-          ))}
-        </div>
-
-        {/* Entity list */}
-        <div className="space-y-0.5">
-          {filtered.map((entity) => (
-            <button
-              key={entity.id}
-              onClick={() => setSelectedEntity(entity)}
-              className={`w-full rounded-md px-3 py-2 text-left transition-colors ${
-                selectedEntity?.id === entity.id
-                  ? "bg-muted"
-                  : "hover:bg-muted/50"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm">{getIcon(entity.type)}</span>
-                <span className="truncate text-sm font-medium">{entity.name}</span>
-              </div>
-              <p className="mt-0.5 truncate pl-6 text-xs text-muted-foreground">
-                {entity.description ?? entity.type}
-              </p>
+              {type}
+              <span className="ml-1 tabular-nums opacity-60">{items.length}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Right: detail panel */}
-      <div className="min-w-0 flex-1">
-        {selectedEntity ? (
-          <div className="rounded-lg border p-5 space-y-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{getIcon(selectedEntity.type)}</span>
-                <h3 className="text-lg font-semibold">{selectedEntity.name}</h3>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{selectedEntity.type}</p>
-            </div>
-
-            {selectedEntity.description && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Description</p>
-                <p className="mt-1 text-sm">{selectedEntity.description}</p>
-              </div>
-            )}
-
-            {selectedEntity.text && (
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Text</p>
-                <p className="mt-1 whitespace-pre-wrap rounded bg-muted/30 p-3 font-mono text-xs leading-relaxed">
-                  {selectedEntity.text}
-                </p>
-              </div>
-            )}
-
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Properties</p>
-              <dl className="mt-1 space-y-1">
-                {Object.entries(selectedEntity.properties)
-                  .filter(([k]) => !["id", "name", "entity_type", "matter_id", "document_id", "extracted_at", "description", "text"].includes(k))
-                  .map(([key, value]) => (
-                    <div key={key} className="flex gap-2 text-sm">
-                      <dt className="shrink-0 text-muted-foreground">{key}:</dt>
-                      <dd className="min-w-0 break-words">{String(value)}</dd>
+      <div className="flex gap-6">
+        {/* ── Entity card grid ── */}
+        <div className="min-w-0 flex-1">
+          <div className="animate-stagger grid grid-cols-2 gap-2 xl:grid-cols-3">
+            {filtered.map((entity) => (
+              <button
+                key={entity.id}
+                onClick={() => setSelectedEntity(entity)}
+                className={`group rounded-lg border p-4 text-left transition-all ${
+                  selectedEntity?.id === entity.id
+                    ? "border-foreground/30 bg-muted/60 shadow-sm"
+                    : "hover:border-foreground/15 hover:bg-muted/30"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`monogram size-9 text-[11px] text-foreground ${getMonogramBg(entity.type)}`}
+                  >
+                    {entity.name[0]}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {entity.name}
                     </div>
-                  ))}
-              </dl>
+                    <div className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {entity.type}
+                    </div>
+                  </div>
+                </div>
+                {entity.description && (
+                  <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                    {entity.description}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Detail panel ── */}
+        <div className="hidden w-80 shrink-0 lg:block">
+          {selectedEntity ? (
+            <div className="sticky top-4 space-y-5 rounded-lg border p-5">
+              {/* Header */}
+              <div className="flex items-start gap-3">
+                <div
+                  className={`monogram size-11 text-sm text-foreground ${getMonogramBg(selectedEntity.type)}`}
+                >
+                  {selectedEntity.name[0]}
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">
+                    {selectedEntity.name}
+                  </h3>
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {selectedEntity.type}
+                  </p>
+                </div>
+              </div>
+
+              {selectedEntity.description && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Description
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-foreground">
+                    {selectedEntity.description}
+                  </p>
+                </div>
+              )}
+
+              {selectedEntity.text && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Source text
+                  </p>
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-md bg-muted/40 p-3 font-mono text-xs leading-relaxed text-foreground">
+                    {selectedEntity.text}
+                  </p>
+                </div>
+              )}
+
+              {/* Properties */}
+              {Object.entries(selectedEntity.properties).filter(
+                ([k]) =>
+                  !["id", "name", "entity_type", "matter_id", "document_id", "extracted_at", "description", "text"].includes(k)
+              ).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Properties
+                  </p>
+                  <dl className="mt-1.5 space-y-1.5">
+                    {Object.entries(selectedEntity.properties)
+                      .filter(
+                        ([k]) =>
+                          !["id", "name", "entity_type", "matter_id", "document_id", "extracted_at", "description", "text"].includes(k)
+                      )
+                      .map(([key, value]) => (
+                        <div key={key} className="flex gap-2 text-sm">
+                          <dt className="shrink-0 font-mono text-xs text-muted-foreground">
+                            {key}
+                          </dt>
+                          <dd className="min-w-0 break-words text-foreground">
+                            {String(value)}
+                          </dd>
+                        </div>
+                      ))}
+                  </dl>
+                </div>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-            Select an entity to view details
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center justify-center rounded-lg border border-dashed py-20 text-sm text-muted-foreground">
+              Select an entity to inspect
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

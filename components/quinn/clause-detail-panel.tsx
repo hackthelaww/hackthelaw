@@ -23,13 +23,13 @@ interface TraceResponse {
 
 function ScoreMeter({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <div className="flex items-baseline justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{formatPercent(value)}</span>
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</span>
+        <span className="font-mono text-xs font-medium tabular-nums">{formatPercent(value)}</span>
       </div>
-      <div className="mt-1 h-1 rounded-full bg-muted">
-        <div className="h-1 rounded-full bg-foreground/70" style={{ width: `${Math.round(value * 100)}%` }} />
+      <div className="score-track">
+        <div className="score-fill" style={{ width: `${Math.round(value * 100)}%` }} />
       </div>
     </div>
   );
@@ -89,9 +89,13 @@ export function ClauseDetailPanel({
 
   if (!clause) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-        <FileText className="size-5 text-muted-foreground/60" />
-        Select a clause to inspect its reasoning and sources.
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+        <div className="rounded-full border border-dashed p-3">
+          <FileText className="size-5 text-muted-foreground/40" />
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Select a clause to inspect its reasoning and sources.
+        </p>
       </div>
     );
   }
@@ -100,108 +104,157 @@ export function ClauseDetailPanel({
 
   return (
     <div className="flex h-full flex-col">
+      {/* ── Header ── */}
       <div className="border-b px-5 py-4">
-        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-muted-foreground">
-          <span>Clause {clause.ref}</span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+            {clause.ref}
+          </span>
           {statusMeta && (
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium">
               <StatusDot tone={statusMeta.dot} />
               {statusMeta.label}
             </span>
           )}
         </div>
-        <h2 className="mt-0.5 font-heading text-lg text-foreground">{clause.heading}</h2>
+        <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+          {clause.heading}
+        </h2>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+      {/* ── Body ── */}
+      <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        {/* Clause text */}
         <section>
-          <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Clause text</h3>
-          <p className="rounded-md bg-muted/60 p-3 text-sm leading-relaxed">{clause.text}</p>
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Clause text
+          </h3>
+          <p className="rounded-md bg-muted/40 p-4 text-sm leading-relaxed text-foreground">
+            {clause.text}
+          </p>
         </section>
 
         {loading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" /> Loading reasoning and sources...
           </div>
         )}
 
         {trace?.finding && (
           <>
-            <section className="grid grid-cols-3 gap-4">
+            {/* Score meters */}
+            <section className="grid grid-cols-3 gap-5">
               <ScoreMeter label="Confidence" value={trace.finding.confidence} />
               <ScoreMeter label="Risk" value={trace.finding.riskScore} />
               <ScoreMeter label="Consequence" value={trace.finding.consequenceScore} />
             </section>
 
+            {/* Model reasoning */}
             <section>
-              <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Why flagged — model reasoning</h3>
-              <p className="text-sm leading-relaxed">{trace.finding.summary}</p>
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Model reasoning
+              </h3>
+              <p className="text-sm leading-relaxed text-foreground">{trace.finding.summary}</p>
             </section>
 
+            {/* GDPR provisions */}
             {trace.provisions.length > 0 && (
               <section>
-                <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Relied on (live GDPR text)</h3>
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Relied on — live GDPR text
+                </h3>
                 <div className="space-y-2">
                   {trace.provisions.map((p) => (
-                    <div key={p.id} className="rounded-md border p-3 text-sm">
-                      <div className="font-medium">
-                        Article {p.article} — {p.title}
+                    <div key={p.id} className="rounded-md border p-4">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-sm font-medium text-foreground">
+                          Art. {p.article} — {p.title}
+                        </span>
+                        <a
+                          href={p.source}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-[10px] text-muted-foreground underline decoration-dotted"
+                        >
+                          source
+                        </a>
                       </div>
-                      <p className="mt-1 text-muted-foreground">{p.text}</p>
-                      <a href={p.source} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs underline">
-                        Source
-                      </a>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{p.text}</p>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
+            {/* Playbook deviations */}
             {trace.deviations.length > 0 && (
               <section>
-                <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Deviates from firm playbook</h3>
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Deviates from firm playbook
+                </h3>
                 <div className="space-y-2">
                   {trace.deviations.map((d, i) => (
-                    <div key={i} className="rounded-md border-l-2 border-foreground bg-muted/40 p-3 text-sm">
-                      <div className="font-medium">
+                    <div key={i} className="rounded-md border-l-2 border-l-foreground bg-muted/30 p-4">
+                      <div className="font-mono text-xs font-medium text-foreground">
                         [{d.rule.code}] {d.rule.title}
                       </div>
-                      <p className="mt-1 text-muted-foreground">{d.explanation}</p>
+                      <p className="mt-1.5 text-sm text-muted-foreground">{d.explanation}</p>
                     </div>
                   ))}
                 </div>
               </section>
             )}
 
+            {/* Provenance */}
             {trace.episodes.length > 0 && (
               <section>
-                <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Provenance</h3>
-                <ul className="space-y-0.5 text-sm text-muted-foreground">
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Provenance
+                </h3>
+                <div className="space-y-1">
                   {trace.episodes.map((e) => (
-                    <li key={e.id}>
-                      {e.label} — {formatDateTime(e.createdAt)}
-                    </li>
+                    <div key={e.id} className="flex items-center gap-2 text-sm">
+                      <span className="size-1 shrink-0 rounded-full bg-foreground/30" />
+                      <span className="text-muted-foreground">{e.label}</span>
+                      <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground/60">
+                        {formatDateTime(e.createdAt)}
+                      </span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </section>
             )}
 
+            {/* Audit trail */}
             {(trace.reviews.length > 0 || trace.signOffs.length > 0) && (
               <section>
-                <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Audit trail</h3>
-                <ul className="space-y-0.5 text-sm text-muted-foreground">
+                <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Audit trail
+                </h3>
+                <div className="space-y-1">
                   {trace.reviews.map((r) => (
-                    <li key={r.id}>
-                      {r.reviewer} {r.decision}d — {formatDateTime(r.at)}
-                      {r.note ? `: "${r.note}"` : ""}
-                    </li>
+                    <div key={r.id} className="flex items-center gap-2 text-sm">
+                      <span className="size-1 shrink-0 rounded-full bg-foreground/50" />
+                      <span className="text-foreground">
+                        {r.reviewer} <span className="text-muted-foreground">{r.decision}d</span>
+                      </span>
+                      <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground/60">
+                        {formatDateTime(r.at)}
+                      </span>
+                    </div>
                   ))}
                   {trace.signOffs.map((s) => (
-                    <li key={s.id}>
-                      Signed off by {s.signer} — {formatDateTime(s.at)}
-                    </li>
+                    <div key={s.id} className="flex items-center gap-2 text-sm">
+                      <span className="size-1 shrink-0 rounded-full bg-foreground/50" />
+                      <span className="text-foreground">
+                        Signed off by {s.signer}
+                      </span>
+                      <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground/60">
+                        {formatDateTime(s.at)}
+                      </span>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </section>
             )}
           </>
@@ -211,7 +264,9 @@ export function ClauseDetailPanel({
           <>
             <Separator />
             <section>
-              <h3 className="mb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Amend summary (optional)</h3>
+              <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Amend summary (optional)
+              </h3>
               <Textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
@@ -222,12 +277,13 @@ export function ClauseDetailPanel({
           </>
         )}
         {readOnly && (
-          <p className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
-            Viewing a historical belief — decide actions are disabled. Return to live to act on this clause.
+          <p className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+            Viewing a historical belief — actions disabled. Return to live to act.
           </p>
         )}
       </div>
 
+      {/* ── Decision buttons ── */}
       {!readOnly && (
         <div className="grid grid-cols-2 gap-2 border-t p-4 sm:grid-cols-4">
           <Button onClick={() => decide("approve")} disabled={!!submitting} variant="default">

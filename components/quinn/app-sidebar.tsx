@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listMattersOverview, type MatterOverview } from "@/lib/graph/queries";
 import { SidebarMatterList } from "@/components/quinn/sidebar-matter-list";
 import { ChatPanel } from "@/components/quinn/chat-panel";
+import { Search } from "lucide-react";
 
 export async function AppSidebar() {
   let matters: MatterOverview[] = [];
@@ -12,14 +13,44 @@ export async function AppSidebar() {
     loadError = err instanceof Error ? err.message : String(err);
   }
 
+  const needsAttention = matters.reduce((sum, m) => sum + m.needsJudgementCount, 0);
+
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r bg-sidebar">
-      <Link href="/" className="px-4 py-4 text-base font-semibold tracking-tight text-sidebar-foreground">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-sidebar">
+      {/* ── Brand ── */}
+      <Link
+        href="/"
+        className="flex items-baseline gap-2 px-5 py-5 text-lg font-semibold tracking-tight text-sidebar-foreground"
+      >
         Quinn
+        <span className="text-[10px] font-normal uppercase tracking-widest text-muted-foreground">
+          Legal
+        </span>
       </Link>
 
-      <div className="flex-1 overflow-y-auto px-2">
-        <p className="px-2 pb-1 text-[11px] uppercase tracking-wide text-muted-foreground">Matters</p>
+      {/* ── Search placeholder ── */}
+      <div className="px-3 pb-3">
+        <div className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar px-2.5 py-1.5 text-sm text-muted-foreground">
+          <Search className="size-3.5" />
+          <span className="text-xs">Search matters...</span>
+          <kbd className="ml-auto rounded border border-sidebar-border px-1 py-px font-mono text-[10px] text-muted-foreground/60">
+            /
+          </kbd>
+        </div>
+      </div>
+
+      {/* ── Matters ── */}
+      <div className="flex-1 overflow-y-auto px-3">
+        <div className="flex items-baseline justify-between px-2 pb-2">
+          <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Matters
+          </span>
+          {needsAttention > 0 && (
+            <span className="rounded-full bg-foreground px-1.5 py-px text-[10px] font-semibold tabular-nums text-background">
+              {needsAttention}
+            </span>
+          )}
+        </div>
         {loadError ? (
           <p className="px-2 py-1 text-xs text-destructive">{loadError}</p>
         ) : matters.length === 0 ? (
@@ -29,10 +60,11 @@ export async function AppSidebar() {
         )}
       </div>
 
-      <div className="border-t px-2 py-2">
+      {/* ── Footer ── */}
+      <div className="border-t px-3 py-2 space-y-0.5">
         <Link
           href="/backend"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
         >
           Backend demo
         </Link>

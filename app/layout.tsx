@@ -33,7 +33,7 @@ export default function RootLayout({
           <TooltipProvider>
             <div className="flex h-full">
               <AppSidebar />
-              <div className="min-w-0 flex-1 overflow-y-auto">{children}</div>
+              <div className="quinn-surface min-w-0 flex-1 overflow-y-auto">{children}</div>
             </div>
             <Toaster />
           </TooltipProvider>
