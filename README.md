@@ -171,6 +171,43 @@ curl http://localhost:8000/health
    sub-processor obligations?" — answered from real graph traversals, with
    citations back to the nodes used.
 
+## Quinn Query Agent — example queries
+
+Quinn's chat uses a Strands-based agent with 5 tools that can search entities,
+traverse graph relationships, read case intelligence events, check document
+history, and retrieve document content. Here are queries that showcase its
+reasoning — from simple lookups to multi-tool analysis.
+
+### Simple queries
+
+| Query | What it exercises |
+|-------|-------------------|
+| "Who are all the people involved in this case?" | Entity search by type |
+| "What deadlines are coming up?" | Search Deadline/TimeConstraint entities |
+| "Show me any contradictions that need attention" | Supabase case events (anomalies) |
+| "When was the last document uploaded and by whom?" | Supabase document history |
+| "What does the pre-action letter say?" | Document content retrieval |
+
+### Multi-tool queries
+
+| Query | Tools used |
+|-------|-----------|
+| "Who drafted the formal complaint and what obligations does it create for TechSolutions?" | search_entities → get_entity_relationships |
+| "What are the key risks and which documents support them?" | search_entities (RiskFactor) + query_case_events |
+| "Are there contradictions between what Mitchell claims and what TechSolutions states?" | query_case_events (anomalies) + search_entities + get_document_content |
+| "Summarise the financial exposure — what amounts are at stake and who owes what?" | search_entities (MonetaryAmount) + get_entity_relationships (OBLIGATED_TO_PAY) |
+| "What evidence shows TechSolutions was notified before the dismissal?" | search_entities (Date) + get_document_content + query_case_events |
+
+### Complex analytical queries
+
+| Query | Reasoning chain |
+|-------|----------------|
+| "Give me a litigation risk assessment — what's strong in our position and where are we vulnerable?" | Combines positive events + anomalies + risk factors + key obligations |
+| "Trace the chain of events from the pregnancy disclosure to the dismissal — what's the timeline and what contradictions exist?" | Multi-hop graph traversal + event timeline + document content |
+| "Which clauses in the employment contract were breached and what's the evidence for each?" | search_entities (Clause) → get_entity_relationships → get_document_content |
+| "Compare what the internal emails say vs the formal complaint — are the narratives consistent?" | get_document_content (multiple docs) + query_case_events (anomalies) |
+| "What's the strongest argument for pregnancy discrimination based on the extracted facts?" | search_entities (multiple types) + query_case_events (positive) + get_entity_relationships |
+
 ## Decisions & assumptions
 
 - **No vector index.** Provision/playbook retrieval uses transparent
