@@ -18,7 +18,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     gcs_bucket: str = ""
 
-    model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8"}
+    # "ignore" rather than the pydantic-settings default of "forbid" — this env
+    # file is shared with the Next.js frontend, which has its own keys
+    # (PERPLEXITY_API_KEY, etc.) that aren't this app's concern.
+    model_config = {"env_file": str(ENV_FILE), "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()  # type: ignore[call-arg]

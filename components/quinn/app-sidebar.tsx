@@ -30,6 +30,12 @@ export async function AppSidebar() {
       </div>
 
       <div className="border-t px-2 py-2">
+        <Link
+          href="/backend"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent"
+        >
+          Backend demo
+        </Link>
         <ChatPanel />
       </div>
     </aside>
