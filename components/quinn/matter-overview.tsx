@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
 import {
   Loader2, CheckCircle2, AlertTriangle, Minus, Clock,
   Shield, FileWarning, ChevronDown, ChevronRight,
-  FileText, Search, Ban, PenLine, X, Sparkles,
-  Users, Calendar, Scale, TrendingUp,
+  FileText, Search, Ban, PenLine,
 } from "lucide-react";
 import { getCaseEvents, resolveEvent, type CaseEvent, type CaseHealth } from "@/lib/backend";
 import { DocumentViewer } from "@/components/quinn/document-viewer";
@@ -549,8 +547,6 @@ export function MatterOverview({ matterId }: { matterId: string }) {
   const [health, setHealth] = useState<CaseHealth | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showBriefing, setShowBriefing] = useState(false);
-
   function fetchEvents() {
     setLoading(true);
     getCaseEvents(matterId)
@@ -601,23 +597,17 @@ export function MatterOverview({ matterId }: { matterId: string }) {
   const unresolvedAnomalies = events.filter((e) => e.category === "anomaly" && !e.resolution);
 
   return (
-    <div className="mx-auto max-w-2xl py-6 space-y-5">
-      {/* Case summary tags + Quinn briefing button */}
-      <div className="flex items-start justify-between gap-4">
-        {health && <CaseSummaryTags events={events} health={health} />}
-
-        {/* Quinn stick man — executive briefing */}
-        <button
-          onClick={() => setShowBriefing(true)}
-          className="group shrink-0 flex items-center gap-2 rounded-full border bg-foreground/5 px-3 py-1.5 text-xs font-medium text-foreground/70 transition-all hover:bg-foreground hover:text-background"
-        >
-          <Sparkles className="size-3.5 transition-transform group-hover:rotate-12" />
-          Briefing
-        </button>
+    <div className="mx-auto max-w-2xl py-4 space-y-4">
+      {/* Section intro */}
+      <div className="rounded-lg border bg-muted/20 px-5 py-4">
+        <h3 className="text-sm font-semibold text-foreground mb-1">Case Intelligence Overview</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Quinn continuously analyses every document uploaded to this case. Each time new evidence arrives,
+          it cross-references facts, dates, and statements against everything already known — surfacing
+          what strengthens your position, flagging contradictions that need your judgement, and tracking
+          the case as it evolves over time. Events are ordered by the date the evidence was filed.
+        </p>
       </div>
-
-      {/* Health bar */}
-      {health && <HealthBar health={health} events={events} />}
 
       {/* Anomaly banner */}
       {unresolvedAnomalies.length > 0 && (
@@ -649,10 +639,6 @@ export function MatterOverview({ matterId }: { matterId: string }) {
         </div>
       </div>
 
-      {/* Executive briefing modal */}
-      {showBriefing && health && (
-        <ExecutiveBriefing events={events} health={health} onClose={() => setShowBriefing(false)} />
-      )}
     </div>
   );
 }

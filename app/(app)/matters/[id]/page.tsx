@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getMatterDetail, getMatterTimeRange } from "@/lib/graph/queries";
 import { MatterDetailTabs } from "@/components/quinn/matter-detail-tabs";
+import { CaseHealthBanner } from "@/components/quinn/case-health-banner";
 import { UploadDocumentButton } from "@/components/quinn/upload-document";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 
@@ -186,8 +187,13 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
+      {/* ── Case Health Banner (visible on all tabs) ── */}
+      <div className="mt-5">
+        <CaseHealthBanner matterId={matter.id} />
+      </div>
+
       {/* ── Tabs & content ── */}
-      <div className="mt-6">
+      <div className="mt-4">
         <MatterDetailTabs
           matterId={matter.id}
           initialClauses={clauses}

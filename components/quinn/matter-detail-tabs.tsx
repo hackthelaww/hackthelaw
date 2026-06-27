@@ -21,7 +21,7 @@ const BackendGraph = dynamic(
   }
 );
 
-type Tab = "overview" | "timeline" | "entities" | "graph" | "clauses";
+type Tab = "timeline" | "overview" | "entities" | "graph" | "clauses";
 
 export function MatterDetailTabs({
   matterId,
@@ -32,7 +32,7 @@ export function MatterDetailTabs({
   initialClauses: ClauseWithFinding[];
   timeRange: MatterTimeRange;
 }) {
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("timeline");
   const hasClauses = initialClauses.length > 0;
 
   const tabCounts = useMemo(() => {
@@ -44,11 +44,11 @@ export function MatterDetailTabs({
     <div className="space-y-6">
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
-          <TabsTrigger value="overview">
-            Overview
-          </TabsTrigger>
           <TabsTrigger value="timeline">
             Timeline
+          </TabsTrigger>
+          <TabsTrigger value="overview">
+            Overview
           </TabsTrigger>
           <TabsTrigger value="entities">
             Entities
