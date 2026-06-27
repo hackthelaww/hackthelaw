@@ -19,7 +19,7 @@ export async function AppSidebar() {
     <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-sidebar">
       {/* ── Brand ── */}
       <Link
-        href="/"
+        href="/matters"
         className="flex items-baseline gap-2 px-5 py-5 text-lg font-semibold tracking-tight text-sidebar-foreground"
       >
         Quinn

@@ -8,7 +8,7 @@ export default function NotFound() {
       <p className="max-w-sm text-sm text-muted-foreground">
         Nothing in the graph matches that id. It may not have been ingested yet.
       </p>
-      <Button size="sm" render={<Link href="/" />}>
+      <Button size="sm" render={<Link href="/matters" />}>
         Back to control tower
       </Button>
     </main>
