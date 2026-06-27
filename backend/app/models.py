@@ -105,3 +105,57 @@ class DeadlineCreate(BaseModel):
 
 class Deadline(DeadlineCreate):
     matter_id: str
+
+
+# ---------------------------------------------------------------------------
+# Case (Supabase-backed, with structured metadata)
+# ---------------------------------------------------------------------------
+
+class CaseCreate(BaseModel):
+    id: str = Field(..., min_length=1, max_length=128, description="Slug, e.g. 'stanford-settlement'")
+    name: str = Field(..., min_length=1)
+    description: str = ""
+    client: str | None = None
+    case_type: str = ""
+    urgency: str = "normal"
+    jurisdiction: str = ""
+    judge: str = ""
+    opposing_counsel: str = ""
+    court: str = ""
+    case_number: str = ""
+    practice_area: str = ""
+
+
+class CaseUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    client: str | None = None
+    case_type: str | None = None
+    status: str | None = None
+    urgency: str | None = None
+    jurisdiction: str | None = None
+    judge: str | None = None
+    opposing_counsel: str | None = None
+    court: str | None = None
+    case_number: str | None = None
+    practice_area: str | None = None
+    deadlines: list[dict] | None = None
+
+
+class DeadlineItem(BaseModel):
+    title: str
+    due_at: datetime
+    description: str = ""
+    completed: bool = False
+
+
+class AISummary(BaseModel):
+    parties: list[dict] = []
+    timeline: list[dict] = []
+    obligations: list[dict] = []
+    risks: list[dict] = []
+    key_facts: list[str] = []
+    monetary_amounts: list[dict] = []
+    jurisdictional_info: dict = {}
+    generated_at: datetime | None = None
+    doc_count: int = 0

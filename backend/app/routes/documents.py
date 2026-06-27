@@ -14,10 +14,11 @@ import tempfile
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
-from app.auth import AuthUser, get_current_user
+from app.auth_middleware import AuthUser, get_current_user
 from app.audit import log_action
 from app.db import read_query, write_query
 from app.ingest.extract_text import extract_text, content_hash
+from app.ingest.similarity import find_similar_documents
 from app.supabase_client import get_supabase, get_case_uuid_by_slug
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
@@ -51,13 +52,23 @@ async def upload_document(
 
     # Determine content type
     ct = file.content_type or ""
-    if file.filename.endswith(".pdf"):
+    fn = file.filename.lower()
+    if fn.endswith(".pdf"):
         ct = "application/pdf"
-    elif file.filename.endswith((".md", ".txt", ".text")):
+    elif fn.endswith((".md", ".txt", ".text")):
         ct = "text/plain"
+    elif fn.endswith((".png",)):
+        ct = "image/png"
+    elif fn.endswith((".jpg", ".jpeg")):
+        ct = "image/jpeg"
+    elif fn.endswith(".eml"):
+        ct = "message/rfc822"
+    elif fn.endswith(".odt"):
+        ct = "application/vnd.oasis.opendocument.text"
 
-    if ct not in ("application/pdf", "text/plain", "text/markdown"):
-        raise HTTPException(400, f"Unsupported file type: {ct}. Use PDF, .txt, or .md")
+    supported = ("application/pdf", "text/plain", "text/markdown", "image/png", "image/jpeg", "image/jpg", "message/rfc822", "application/vnd.oasis.opendocument.text")
+    if ct not in supported:
+        raise HTTPException(400, f"Unsupported file type: {ct}. Supported: PDF, TXT, MD, PNG, JPG, EML, ODT")
 
     # Verify matter exists in Neo4j
     rows = await read_query("MATCH (m:Matter {id: $id}) RETURN m.id AS id", {"id": matter_id})
@@ -145,6 +156,27 @@ async def upload_document(
         "storage_path": storage_path,
     }
 
+    # Run similarity detection against existing docs in the case
+    similarity = None
+    if case_uuid:
+        try:
+            similarity = await find_similar_documents(
+                new_text=text,
+                new_hash=c_hash,
+                matter_slug=matter_id,
+                case_uuid=case_uuid,
+                supabase_client=get_supabase(),
+                neo4j_read_query=read_query,
+            )
+            # Update Supabase row with similarity info
+            get_supabase().table("case_documents").update({
+                "similarity_status": similarity.status,
+                "similarity_score": similarity.score,
+                "similarity_parent_id": similarity.matched_document_id,
+            }).eq("id", case_doc_id).execute()
+        except Exception:
+            pass  # Similarity detection failed, continue
+
     log_action(
         "document_uploaded",
         case_id=case_uuid,
@@ -162,6 +194,7 @@ async def upload_document(
         "preview": text[:2000],
         "full_text": text,
         "duplicate": existing[0] if existing else None,
+        "similarity": similarity.to_dict() if similarity else None,
     }
 
 
@@ -481,3 +514,36 @@ async def list_documents_for_matter(matter_id: str) -> list[dict]:
         {**r["doc"], "version_count": r["version_count"], "latest_version_at": r["latest_version_at"]}
         for r in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Link a near-duplicate as a new version of an existing document
+# ---------------------------------------------------------------------------
+
+class LinkVersionRequest(BaseModel):
+    new_document_id: str      # case_documents.id of the new upload
+    parent_document_id: str   # case_documents.id of the existing doc
+
+
+@router.post("/link-version")
+async def link_as_version(body: LinkVersionRequest, user: AuthUser = Depends(get_current_user)) -> dict:
+    """Link a near-duplicate document as a new version of an existing document."""
+    parent = (
+        get_supabase()
+        .table("case_documents")
+        .select("version_number")
+        .eq("id", body.parent_document_id)
+        .single()
+        .execute()
+    )
+    if not parent.data:
+        raise HTTPException(404, "Parent document not found")
+
+    new_version = (parent.data.get("version_number") or 1) + 1
+
+    get_supabase().table("case_documents").update({
+        "parent_document_id": body.parent_document_id,
+        "version_number": new_version,
+    }).eq("id", body.new_document_id).execute()
+
+    return {"linked": True, "version_number": new_version}
